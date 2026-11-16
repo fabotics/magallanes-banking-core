@@ -53,9 +53,11 @@ app/
   db.py                repository: every database call
   errors.py            one error shape: {"error", "message"}
   email.py             optional proposal email
+  messaging.py         optional call summary over Telegram
   mcp_server.py        MCP endpoint with the merchant lookup tool
   schemas.py, schemas_insurance.py
-  routers/             identity, customers, accounts, cards, cases, insurance, registry, signing
+  routers/             identity, customers, accounts, cards, cases, insurance, registry,
+                       notifications, signing
   templates/sign.html  signature page
 db/schema.sql          tables, checks, indexes, row level security
 seed/                  fictional customers and transactions, dated relative to today
@@ -99,6 +101,7 @@ Interactive documentation is served at `/docs`.
 | GET `/v1/insurance/eligibility` | yes | Products the bank pre-approves, or the reason there are none |
 | POST `/v1/insurance/offers` | yes | Record an offer and the answer: accepted, declined, info_requested |
 | POST `/v1/insurance/proposals` | yes | Create the proposal for an offer. Accepted offers get a signing link |
+| POST `/v1/notifications/call-summary` | yes | Send a written summary of the call to the customer's messaging channel (Telegram) |
 | GET `/v1/registry/merchants/{tax_id}` | no | The business behind a merchant tax ID |
 | GET, POST `/sign/{token}` | no | Signature page. Signing creates the policy |
 | POST `/mcp` | no | MCP server with one tool, `lookup_merchant`. Same key, in `X-API-Key` or as a bearer token |
@@ -151,7 +154,7 @@ python scripts/seed.py --reset
 uvicorn app.main:app --reload
 ```
 
-`python scripts/seed.py --reset` wipes every table and reloads the seed. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, which unlocks a locked customer.
+`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the demo customer gets them, so proposals and call summaries reach you. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, which unlocks a locked customer.
 
 ### Seed customers
 
@@ -186,7 +189,7 @@ python scripts/smoke_test.py --base-url http://localhost:8000
 The API runs on Vercel as one Python function with no extra configuration: `app/main.py` exports `app`, dependencies come from `requirements.txt`, and `.python-version` selects Python 3.12.
 
 1. Import the repository as a new Vercel project. Production branch: `main`.
-2. Set the environment variables: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `BANK_API_KEY`, and `PUBLIC_BASE_URL` (the production URL, used to build signing links). Optional: `TRANSACTIONS_DELAY_SECONDS`, `RESEND_API_KEY`, `EMAIL_FROM`.
+2. Set the environment variables: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `BANK_API_KEY`, and `PUBLIC_BASE_URL` (the production URL, used to build signing links). Optional: `TRANSACTIONS_DELAY_SECONDS`, `RESEND_API_KEY`, `EMAIL_FROM`, `TELEGRAM_BOT_TOKEN`.
 3. Deploy, then run the smoke test against the production URL.
 
 ## Connecting an agent
@@ -198,6 +201,7 @@ Each endpoint maps to one webhook tool on any agent platform that can call HTTP 
 - Pass the platform's conversation ID as `conversation_id` when verifying. The API then ties every later call, case and offer to that conversation.
 - Keep `offer_id` from `offers` to request the proposal, and read `case_number` and block `reference` back to the customer.
 - `transactions` waits about one second before answering, like a legacy system would. Have the agent say something while it waits.
+- At the end of the conversation, send a short `call summary`. The API delivers it to the channel the bank has on file and answers `sent: false` when there is none.
 - When `eligibility` answers `eligible: false`, the agent makes no offer. When `verify` answers `locked: true`, the agent opens a handoff case.
 
 ### Merchant lookup over MCP
@@ -221,7 +225,6 @@ python scripts/mcp_check.py --base-url http://localhost:8000
 
 ## Roadmap
 
-- Call summary sent to the customer's messaging channel after the conversation.
 - CRM sync for cases and opportunities.
 - Operations dashboard on the audit, offers and cases tables.
 - Proposal expiry.
