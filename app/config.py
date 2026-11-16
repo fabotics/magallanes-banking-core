@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     public_base_url: str = "http://localhost:8000"
     demo_customer_email: str = ""
     transactions_delay_seconds: float = 1.0
+    resend_api_key: str = ""
+    email_from: str = "Banco Magallanes <onboarding@resend.dev>"
 
 
 @lru_cache
