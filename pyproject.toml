@@ -1,0 +1,12 @@
+# Tool settings only. Dependencies live in requirements.txt, so the host installs from there.
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E, F: basic errors. I: import order. B: likely bugs. UP: modern syntax.
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

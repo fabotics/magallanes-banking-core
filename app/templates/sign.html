@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Banco Magallanes | Firma de propuesta</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f3f5f8; color: #1c2733; margin: 0; }
+    main { max-width: 30rem; margin: 3rem auto; background: #fff; padding: 2rem; border-radius: 12px; }
+    h1 { font-size: 1.25rem; color: #0b3d6b; }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: .5rem 1rem; }
+    dt { color: #5b6876; }
+    dd { margin: 0; font-weight: 600; }
+    button { width: 100%; padding: .9rem; border: 0; border-radius: 8px; background: #0b3d6b;
+             color: #fff; font-size: 1rem; cursor: pointer; }
+    .ok { color: #17753a; font-weight: 600; }
+    small { color: #5b6876; }
+  </style>
+</head>
+<body>
+<main>
+  <p><strong>Banco Magallanes</strong></p>
+  {% if proposal is none %}
+    <h1>Enlace no válido</h1>
+    <p>No encontramos una propuesta para este enlace. Revisa el correo que te enviamos.</p>
+  {% else %}
+    <h1>Propuesta {{ proposal.proposal_number }}</h1>
+    <p>Hola {{ customer.first_name }}, esta es la propuesta que conversamos.</p>
+    <dl>
+      <dt>Producto</dt><dd>{{ product.name }}</dd>
+      <dt>Prima mensual</dt><dd>{{ product.monthly_premium }} {{ product.currency }}</dd>
+      <dt>Cobertura</dt><dd>{{ product.coverage_summary }}</dd>
+    </dl>
+    {% if proposal.status == "signed" %}
+      <p class="ok">Propuesta firmada. Tu seguro ya está activo.</p>
+    {% elif proposal.status == "sent" %}
+      <form method="post">
+        <button type="submit">Firmar propuesta</button>
+      </form>
+      <p><small>Al firmar aceptas contratar este seguro con cargo a tu tarjeta.</small></p>
+    {% else %}
+      <p>Esta propuesta ya no está vigente.</p>
+    {% endif %}
+  {% endif %}
+  <p><small>Demo. Banco Magallanes es un banco ficticio.</small></p>
+</main>
+</body>
+</html>
