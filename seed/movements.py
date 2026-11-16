@@ -1,9 +1,9 @@
 """Seed card transactions, dated relative to the day the seed runs.
 
-The story stays fresh on any day: each of the two demo customers spent a
-Saturday evening at the same restaurant and bar, where each round was paid on
-its own, and the place presented the whole weekend to the bank on Monday. So
-she sees several charges dated Monday for things she bought on Saturday night.
+The story stays fresh on any day: each of the demo customers spent a Saturday
+evening at the same restaurant and bar, where each round was paid on its own,
+and the place presented the whole weekend to the bank on Monday. So each one
+sees several charges dated Monday for things bought on Saturday night.
 Descriptors are cryptic on purpose, the way they look on a real statement.
 """
 
@@ -29,6 +29,8 @@ SUPPORTING_CUSTOMERS = ["carolina", "jorge", "lucia", "rosa", "diego", "camila",
 # The evening at the restaurant: hour, minute and amount of each round.
 EVENING_ROUNDS = [(21, 52, 8400), (22, 37, 11200), (23, 14, 8400), (23, 58, 6900)]
 EMMA_ROUNDS = [(20, 41, 9800), (21, 34, 7600), (22, 18, 12400), (23, 5, 7600), (23, 49, 5900)]
+DANIEL_ROUNDS = [(20, 55, 6800), (21, 48, 9400), (22, 31, 7200), (23, 12, 9400), (23, 54, 5600)]
+EVENINGS = (("daniel", DANIEL_ROUNDS), ("emma", EMMA_ROUNDS), ("marta", EVENING_ROUNDS))
 
 
 def posting_monday(today: date) -> date:
@@ -81,14 +83,22 @@ def build_transactions(today: date) -> list[dict]:
 
     monday = posting_monday(today)
     saturday = monday - timedelta(days=2)
-    # Emma and Marta, golden path: rounds on Saturday night, all posted on Monday.
+    # Daniel, Emma and Marta, golden path: rounds on Saturday night, all posted on Monday.
     rows = [
         movement(key, f"restaurant-{number}", saturday, hour, minute, amount,
                  "MERPAGO*INVGASTRO PROV", "5812", tax_id=RESTAURANT_TAX_ID, posted=monday)
-        for key, rounds in (("emma", EMMA_ROUNDS), ("marta", EVENING_ROUNDS))
+        for key, rounds in EVENINGS
         for number, (hour, minute, amount) in enumerate(rounds, start=1)
     ]  # fmt: skip
     rows += [
+        movement("daniel", "ride", ago(1), 18, 55, 5900, "APP*VIAJES STGO", "4121",
+                 channel="ecommerce", pending=True),
+        movement("daniel", "supermarket", ago(2), 19, 30, 41870, "SUPERMERC DON LUCHO 012", "5411"),
+        movement("daniel", "gym", ago(7), 7, 15, 34900, "CLUB DEPORTIVO ORIENTE", "7997"),
+        movement("daniel", "streaming", ago(12), 6, 0, 9480, "STREAMFLIX.COM 866-000", "4899",
+                 channel="ecommerce", country="US", usd=9.99),
+        movement("daniel", "airline", ago(21), 9, 5, 688400, "AEROSUR WEB SCL", "4511",
+                 channel="ecommerce"),
         movement("emma", "ride", ago(1), 19, 40, 7200, "APP*VIAJES STGO", "4121",
                  channel="ecommerce", pending=True),
         movement("emma", "supermarket", ago(3), 18, 25, 52340, "SUPERMERC DON LUCHO 012", "5411"),

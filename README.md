@@ -205,12 +205,13 @@ python scripts/seed.py --reset
 uvicorn app.main:app --reload
 ```
 
-`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the two demo customers (Emma, who speaks English, and Marta, who speaks Spanish) get them, so proposals, confirmations and call summaries reach you. If `DEMO_CUSTOMER_PHONE` is set, it becomes the phone on file for Emma, so a call from that phone is matched to her. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, pending confirmations, proposals and app sessions, and restores every app PIN, which unlocks a locked customer.
+`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the three demo customers (Daniel and Emma, who speak English, and Marta, who speaks Spanish) get them, so proposals, confirmations and call summaries reach you. If `DEMO_CUSTOMER_PHONE` is set, it becomes the phone on file for Daniel, so a call from that phone is matched to him. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, pending confirmations, proposals and app sessions, and restores every app PIN, which unlocks a locked customer.
 
 ### Seed customers
 
 | Customer | Document | Card | Birth year | Story |
 | --- | --- | --- | --- | --- |
+| Daniel | 35.628.194-2 | 5519 | 1992 | English speaker living in Santiago. Sees five charges dated Monday and bought nothing on Monday: five rounds at one restaurant and bar on Saturday night, posted together. Eligible for insurance, premium segment |
 | Emma | 35.897.932-7 | 6302 | 1988 | English speaker living in Santiago. Sees five charges dated Monday and bought nothing on Monday: five rounds at one restaurant and bar on Saturday night, posted together. Eligible for insurance, premium segment |
 | Marta | 31.415.926-8 | 4821 | 1986 | Sees four charges dated Monday and bought nothing on Monday: four rounds at one restaurant on Saturday night, posted together. Eligible for insurance |
 | Pedro Pablo | 32.718.281-1 | 7730 | 1979 | Two online charges at night from abroad, in dollars |

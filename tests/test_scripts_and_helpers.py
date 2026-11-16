@@ -30,11 +30,11 @@ def test_reset_reloads_the_seed_and_unlocks_a_locked_customer(
     assert repository.select("verification_attempts") == []
     assert repository.select("audit_log") == []
     assert repository.select("cards", {"last4": "4821"})[0]["status"] == "active"
-    assert len(repository.select("customers")) == 11
+    assert len(repository.select("customers")) == 12
     assert client.post("/v1/identity/verify", json=MARTA, headers=API_KEY).json()["verified"]
 
 
-def test_reset_gives_the_demo_contact_details_to_the_two_demo_customers(
+def test_reset_gives_the_demo_contact_details_to_the_demo_customers(
     repository: InMemoryRepository,
 ) -> None:
     reset(repository, demo_email="demo@example.org", demo_chat_id="987654")
@@ -42,7 +42,9 @@ def test_reset_gives_the_demo_contact_details_to_the_two_demo_customers(
     assert marta["email"] == "demo@example.org" and marta["telegram_chat_id"] == "987654"
     emma = repository.select("customers", {"id": seed_id("customer/emma")})[0]
     assert emma["email"] == "demo@example.org" and emma["telegram_chat_id"] == "987654"
-    demo = {marta["id"], emma["id"]}
+    daniel = repository.select("customers", {"id": seed_id("customer/daniel")})[0]
+    assert daniel["email"] == "demo@example.org" and daniel["telegram_chat_id"] == "987654"
+    demo = {marta["id"], emma["id"], daniel["id"]}
     others = [row for row in repository.select("customers") if row["id"] not in demo]
     assert all(row["telegram_chat_id"] is None for row in others)
 
@@ -53,7 +55,7 @@ def test_print_counts_lists_every_table(
     print_counts(repository)
     lines = capsys.readouterr().out.splitlines()
     assert [line.split()[0] for line in lines] == TABLES
-    assert "customers                  11" in lines
+    assert "customers                  12" in lines
 
 
 def test_masks_keep_only_what_is_safe_to_show() -> None:

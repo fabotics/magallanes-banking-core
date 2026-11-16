@@ -46,5 +46,5 @@ def test_a_number_is_dialled_without_spaces() -> None:
 
 def test_the_demo_phone_goes_to_the_first_demo_customer_only() -> None:
     customers = build_seed(demo_phone="+56900000001")["customers"]
-    assert [row["first_name"] for row in customers if row["phone"] == "+56900000001"] == ["Emma"]
+    assert [row["first_name"] for row in customers if row["phone"] == "+56900000001"] == ["Daniel"]
     assert len({row["phone"] for row in customers}) == len(customers)
