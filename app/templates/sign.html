@@ -1,36 +1,8 @@
-<!doctype html>
-<html lang="{{ lang }}">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Banco Magallanes | {{ t.link_title }}</title>
-  <style>
-    body { font-family: system-ui, sans-serif; background: #eef4f3; color: #10242b; margin: 0; }
-    main { max-width: 30rem; margin: 3rem auto; background: #fff; padding: 2rem; border-radius: 12px; }
-    h1 { font-size: 1.25rem; color: #0f4c5c; }
-    dl { display: grid; grid-template-columns: auto 1fr; gap: .5rem 1rem; }
-    dt { color: #5f7379; }
-    dd { margin: 0; font-weight: 600; }
-    button { width: 100%; padding: .9rem; border: 0; border-radius: 8px; background: #0f4c5c;
-             color: #fff; font-size: 1rem; cursor: pointer; }
-    .ok { color: #17753a; font-weight: 600; }
-    small { color: #5f7379; }
-    .top { display: flex; justify-content: space-between; align-items: center; }
-    .langs a { padding: .2rem .45rem; border-radius: 6px; color: #5f7379; text-decoration: none;
-               font-size: .8rem; font-weight: 600; }
-    .langs a[aria-current] { background: #eef4f3; color: #0f4c5c; }
-  </style>
-</head>
-<body>
-<main>
-  <div class="top">
-    <strong>Banco Magallanes</strong>
-    <nav class="langs" aria-label="Idioma / Language">
-      {% for code, href in languages %}
-      <a href="{{ href }}" lang="{{ code }}"{% if code == lang %} aria-current="true"{% endif %}>{{ code|upper }}</a>
-      {% endfor %}
-    </nav>
-  </div>
+{# The signing link page. It wears the same frame as the app, without the menu: the customer
+   came from a link and has not signed in. #}
+{% extends "app/base.html" %}
+{% block title %}{{ t.link_title }}{% endblock %}
+{% block content %}
   {% if proposal is none %}
     <h1>{{ t.link_invalid_title }}</h1>
     <p>{{ t.link_invalid_text }}</p>
@@ -54,12 +26,9 @@
       <form method="post">
         <button type="submit">{{ t.link_sign }}</button>
       </form>
-      <p><small>{{ t.link_consent }}</small></p>
+      <p class="muted small">{{ t.link_consent }}</p>
     {% else %}
       <p>{{ t.link_expired }}</p>
     {% endif %}
   {% endif %}
-  <p><small>{{ t.footer }}</small></p>
-</main>
-</body>
-</html>
+{% endblock %}

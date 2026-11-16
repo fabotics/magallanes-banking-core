@@ -17,6 +17,7 @@ from app.routers import (
     app_auth,
     app_contract,
     app_pages,
+    brand,
     cards,
     cases,
     customers,
@@ -84,6 +85,8 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
     app.include_router(app_pages.router)
     app.include_router(app_contract.router)
     app.include_router(app_assistant.router)
+    # The icons and the web manifest, at the root addresses browsers ask for.
+    app.include_router(brand.router)
     # The MCP endpoint checks the same API key itself, in a header or as a bearer token.
     app.include_router(mcp_server.router)
     return app
