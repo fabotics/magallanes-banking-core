@@ -1,14 +1,14 @@
 """Repository: every database call lives here.
 
 The rest of the app talks to a `Repository`, a small set of table operations,
-and never to the Supabase client. That is what lets the tests swap in an
-in-memory repository and run without a network.
+and never to the Supabase client. That is what lets the tests create the app
+with an in-memory repository and run without a network.
 """
 
 from functools import lru_cache
 from typing import Annotated, Any, Protocol
 
-from fastapi import Depends
+from fastapi import Depends, FastAPI, Request
 from supabase import Client, create_client
 
 from app.config import Settings, get_settings
@@ -82,17 +82,29 @@ def _client(url: str, key: str) -> Client:
     return create_client(url, key)
 
 
-def get_repository(settings: Annotated[Settings, Depends(get_settings)]) -> Repository:
-    """Return the repository for this request. Tests override this dependency."""
+def build_repository(settings: Settings) -> Repository:
+    """Return the Supabase repository, or answer HTTP 503 if it is not configured."""
     if not settings.supabase_url or not settings.supabase_secret_key:
         raise ApiError(503, "database_not_configured", "The database is not configured.")
     return SupabaseRepository(_client(settings.supabase_url, settings.supabase_secret_key))
 
 
-def database_status(settings: Settings) -> str:
+def repository_for(app: FastAPI, settings: Settings) -> Repository:
+    """Return the repository the app was created with (tests), else the Supabase one."""
+    return app.state.repository or build_repository(settings)
+
+
+def get_repository(
+    request: Request, settings: Annotated[Settings, Depends(get_settings)]
+) -> Repository:
+    """Dependency that hands the repository to an endpoint."""
+    return repository_for(request.app, settings)
+
+
+def database_status(app: FastAPI, settings: Settings) -> str:
     """Describe the database for the health check: ok, unreachable or not_configured."""
     try:
-        repository = get_repository(settings)
+        repository = repository_for(app, settings)
     except ApiError:
         return "not_configured"
     return "ok" if repository.ping() else "unreachable"

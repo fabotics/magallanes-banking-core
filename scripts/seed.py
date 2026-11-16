@@ -16,7 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import get_settings  # noqa: E402
-from app.db import Repository, get_repository  # noqa: E402
+from app.db import Repository, build_repository  # noqa: E402
 from seed.data import TABLES, build_seed  # noqa: E402
 
 
@@ -46,7 +46,7 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = get_settings()
-    repository = get_repository(settings)
+    repository = build_repository(settings)
     if args.reset:
         reset(repository, settings.demo_customer_email)
         print("Reset done.")
