@@ -1,10 +1,13 @@
 """Insurance: the bank's eligibility rules, the consent record, proposals and signing."""
 
+from datetime import timedelta
+
 import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from app.clock import bank_date, utc_now
 from app.config import Settings, get_settings
 from seed.helpers import seed_id
 from tests.conftest import API_KEY, TEST_API_KEY
@@ -111,10 +114,13 @@ def test_accepted_offer_gets_a_proposal_with_a_signing_link(
     assert again.json() == body and len(repository.select("proposals")) == 1
 
 
-def test_info_request_gets_details_without_a_signing_link(client: TestClient, marta: dict) -> None:
+def test_info_request_gets_a_proposal_to_sign_as_well(client: TestClient, marta: dict) -> None:
     offer_id = offer(client, marta, "info_requested")["offer_id"]
     body = client.post("/v1/insurance/proposals", json={"offer_id": offer_id}, headers=marta).json()
-    assert "signing_url" not in body and body["proposal_number"].startswith("PR-")
+    assert "/sign/" in body["signing_url"] and body["proposal_number"].startswith("PR-")
+    # The last day to sign is 15 days from today at the bank, the same as the quote.
+    last_day = bank_date(utc_now() + timedelta(days=15)).isoformat()
+    assert body["valid_until"] == last_day
 
 
 def test_declined_or_foreign_offers_get_no_proposal(client: TestClient, marta: dict) -> None:

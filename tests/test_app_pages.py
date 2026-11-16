@@ -156,14 +156,19 @@ def test_signing_in_the_app_creates_the_policy(
     assert "Propuesta firmada" in signed_in.get(link).text
 
 
-def test_other_proposals_and_details_only_cannot_be_signed(
+def test_an_unknown_proposal_cannot_be_opened(signed_in: TestClient) -> None:
+    assert "No disponible" in signed_in.get("/app/proposals/PR-2026-NOPE00").text
+
+
+def test_asking_for_the_details_also_puts_the_contract_in_the_app(
     signed_in: TestClient, repository: InMemoryRepository, marta: dict
 ) -> None:
-    assert "No disponible" in signed_in.get("/app/proposals/PR-2026-NOPE00").text
     offer = {"product_code": "CARD_FRAUD", "customer_response": "info_requested"}
     offer_id = signed_in.post("/v1/insurance/offers", json=offer, headers=marta).json()["offer_id"]
     body = {"offer_id": offer_id}
     details = signed_in.post("/v1/insurance/proposals", json=body, headers=marta).json()
     path = f"/app/proposals/{details['proposal_number']}"
-    assert "No disponible" in signed_in.post(path, data=SIGNATURE).text
-    assert repository.select("policies", {"customer_id": seed_id("customer/marta")}) == []
+    # It waits on the home page like any proposal, and signing it is what accepts it.
+    assert path in signed_in.get("/app/home").text
+    assert "Firma recibida" in signed_in.post(path, data=SIGNATURE).text
+    assert len(repository.select("policies", {"customer_id": seed_id("customer/marta")})) == 1

@@ -64,11 +64,12 @@ class ProposalRequest(BaseModel):
 
 
 class ProposalResponse(BaseModel):
-    """The proposal. `signing_url` is absent when the customer only asked for information."""
+    """The proposal, waiting in the customer's app to be read and signed."""
 
     proposal_number: str
     quote_number: str | None = None
     signing_url: str | None = None
+    valid_until: str = Field(description="ISO date. The last day the customer can sign it.")
     sent_to: str = Field(description="Masked address, safe to read aloud.")
     email_sent: bool = Field(description="False when the API is not configured to send email.")
     message_sent: bool = Field(

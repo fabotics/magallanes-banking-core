@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field
 
 
 class PushRequest(BaseModel):
@@ -10,7 +10,10 @@ class PushRequest(BaseModel):
 
     Name the customer in one of three ways, whichever the channel gives: the
     reference a conversation started inside the app carries, the number a phone
-    call comes from, or the national ID number the customer says.
+    call comes from, or the national ID number the customer says. A caller may
+    send both the reference and the phone, whatever its channel carries: the
+    bank uses the one that names a customer. A request that names nobody is
+    answered `not_identified`, and the caller then asks for the ID number.
     """
 
     customer_id: str | None = Field(
@@ -31,18 +34,15 @@ class PushRequest(BaseModel):
         "Absent: the language the bank has on file for the customer.",
     )
 
-    @model_validator(mode="after")
-    def names_a_customer(self) -> "PushRequest":
-        """Refuse a request that names nobody."""
-        if not (self.customer_id or self.customer_ref or self.phone):
-            raise ValueError("Send customer_id, customer_ref or phone.")
-        return self
-
 
 class PushResponse(BaseModel):
-    """The pending request. The answer is the same whether or not the customer exists."""
+    """The pending request, or `not_identified` when the channel names no customer.
 
-    status: Literal["pending", "locked"]
+    For an ID number the customer said, the answer is `pending` whether or not
+    that number is known, so it says nothing about who is a customer.
+    """
+
+    status: Literal["pending", "locked", "not_identified"]
     request_id: str | None = Field(
         default=None, description="Ask for the result with this ID. Absent when locked."
     )

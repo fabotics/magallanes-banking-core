@@ -30,26 +30,38 @@ def normalize_phone(value: str) -> str:
     return "+" + "".join(character for character in value if character.isdigit())
 
 
+def by_reference(repository: Repository, reference: str | None) -> Row | None:
+    """Return the customer with this reference, if it is one of the bank's references."""
+    try:
+        found = repository.select("customers", {"id": str(uuid.UUID(reference or ""))})
+    except ValueError:
+        return None
+    return found[0] if found else None
+
+
 def named_customer(
     repository: Repository, reference: str | None, phone: str | None, document: str
-) -> tuple[Row | None, str]:
-    """Return the customer a request names, and the key its failed attempts count under.
+) -> tuple[Row | None, str, str]:
+    """Return the customer a request names, the key its attempts count under, and how.
 
+    An ID number the customer said comes first: it is the one thing they chose
+    to give. Otherwise the channel names them: the app's reference if it is a
+    real one, else the phone the call comes from. How is `document`,
+    `reference`, `phone`, or `nobody` when the channel names no customer.
     A known customer always counts under their document number, so the lockout
-    is one and the same whichever way they were named. An unknown reference or
-    phone counts under itself.
+    is one and the same whichever way they were named.
     """
-    if reference:
-        try:
-            filters, key = {"id": str(uuid.UUID(reference))}, f"ref:{reference[:40]}"
-        except ValueError:
-            return None, f"ref:{reference[:40]}"
-    elif phone:
-        filters, key = {"phone": normalize_phone(phone)}, f"phone:{normalize_phone(phone)}"
-    else:
-        filters, key = {"document_number": document}, document
-    customers = repository.select("customers", filters)
-    return (customers[0], customers[0]["document_number"]) if customers else (None, key)
+    if document:
+        found = repository.select("customers", {"document_number": document})
+        return (found[0] if found else None), document, "document"
+    customer = by_reference(repository, reference)
+    if customer:
+        return customer, customer["document_number"], "reference"
+    if phone:
+        found = repository.select("customers", {"phone": normalize_phone(phone)})
+        if found:
+            return found[0], found[0]["document_number"], "phone"
+    return None, "", "nobody"
 
 
 def create(

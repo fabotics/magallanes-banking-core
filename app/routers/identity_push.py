@@ -33,19 +33,27 @@ def request_confirmation(
     repository: Annotated[Repository, Depends(get_repository)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> PushResponse:
-    """Create a pending confirmation and notify the customer. Never says if they exist."""
+    """Create a pending confirmation and notify the customer.
+
+    For an ID number the answer never says whether it is known. When only the
+    channel names the customer and it names nobody, the answer is
+    `not_identified`, so the caller asks for the ID number instead of waiting
+    for an approval that cannot come.
+    """
     now = utc_now()
     spoken = normalize_document(body.customer_id or "")
-    customer, document = confirmations.named_customer(
+    customer, document, named_by = confirmations.named_customer(
         repository, body.customer_ref, body.phone, spoken
     )
-    named_by = "reference" if body.customer_ref else "phone" if body.phone else "document"
     audit.note(
         request,
         conversation_id=body.conversation_id,
         document=audit.mask(document),
         named_by=named_by,
     )
+    if named_by == "nobody":
+        audit.note(request, outcome="channel_names_nobody")
+        return PushResponse(status="not_identified")
     if recent_failures(repository, document, now) >= MAX_FAILED_ATTEMPTS:
         audit.note(request, outcome="locked")
         return PushResponse(status="locked")

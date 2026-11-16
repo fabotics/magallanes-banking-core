@@ -7,12 +7,16 @@ Reads BANK_API_KEY from the environment or `.env`. It uses the seeded demo
 customer and exits with code 1 if any step answers with an unexpected status.
 It writes a few rows (a confirmation request, an offer, a proposal, a case, audit rows),
 sends the demo customer the matching messages, signs nothing and blocks no card.
+It also proves the waiting path: a status request is held while the confirmation is
+pending, and answers at once when the customer approves in the app during the wait.
 The last step connects to `/mcp` with the MCP SDK client and calls the lookup tool.
 """
 
 import argparse
 import asyncio
 import sys
+import threading
+import time
 from pathlib import Path
 
 import httpx
@@ -22,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import get_settings  # noqa: E402
 from scripts.mcp_check import check as check_mcp  # noqa: E402
+from seed.helpers import app_pin, seed_id  # noqa: E402
 
 DEMO_CUSTOMER = {"document_number": "31.415.926-8", "card_last4": "4821", "birth_year": 1986}
 CONVERSATION = "smoke-test"
@@ -46,6 +51,34 @@ class Smoke:
         return response.json() if is_json else {}
 
 
+def approve_in_app(base_url: str, request_id: str, pin: str, after: float) -> None:
+    """Sign in to the app as the demo customer and approve the request, after a pause."""
+    time.sleep(after)
+    with httpx.Client(base_url=base_url, timeout=30) as app:
+        app.post("/app/login", data={"u": seed_id("customer/marta"), "pin": pin})
+        app.post(f"/app/confirmations/{request_id}", data={"decision": "approve"})
+
+
+def waiting_path(smoke: Smoke, request_id: str) -> None:
+    """Hold a status request while pending, then let an approval end the wait early."""
+    path = f"/v1/identity/push/{request_id}"
+    started = time.monotonic()
+    held = smoke.step("wait is held while pending", 200, "GET", path, params={"wait": 3})
+    print(f"{'':34} status: {held.get('status')} after {time.monotonic() - started:.1f} s")
+    pin_secret = get_settings().app_pin_secret
+    if not pin_secret:
+        return print(f"{'':34} no APP_PIN_SECRET: the approval during a wait is skipped")
+    base_url = str(smoke.client.base_url)
+    approval = (base_url, request_id, app_pin(pin_secret, "marta"), 2.0)
+    threading.Thread(target=approve_in_app, args=approval).start()
+    started = time.monotonic()
+    answer = smoke.step("approval ends the wait", 200, "GET", path, params={"wait": 15})
+    took = time.monotonic() - started
+    print(f"{'':34} status: {answer.get('status')} after {took:.1f} s of a 15 s wait")
+    if answer.get("status") != "approved" or took > 12:
+        smoke.failures += 1
+
+
 def run(smoke: Smoke) -> None:
     """The golden path: verify, read, check eligibility, record an offer, send details."""
     smoke.step("health", 200, "GET", "/health")
@@ -58,6 +91,7 @@ def run(smoke: Smoke) -> None:
         "confirmation is pending", 200, "GET", f"/v1/identity/push/{pushed.get('request_id')}"
     )
     print(f"{'':34} status: {waiting.get('status')}")
+    waiting_path(smoke, pushed.get("request_id", ""))
     verified = smoke.step(
         "verify identity", 200, "POST", "/v1/identity/verify",
         json={**DEMO_CUSTOMER, "conversation_id": CONVERSATION},

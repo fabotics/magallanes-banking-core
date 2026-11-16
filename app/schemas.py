@@ -72,17 +72,36 @@ class CardTransaction(BaseModel):
     merchant_tax_id: str | None
     channel: str
     country: str
-    transaction_at: str
+    transaction_at: str = Field(description="When it was made, on the bank's clock.")
     posted_at: str | None = Field(description="Null while the charge is pending.")
+    purchased_on: str = Field(description="Day it was made, in words: Saturday 14 November 2026.")
+    purchased_time: str = Field(description="Hour it was made at the bank, 24 hour clock: 21:52.")
+    posted_on: str | None = Field(description="Day the bank posted it, in words. Null if pending.")
     status: str
     original_amount: float | None = Field(default=None, description="Only on foreign charges.")
     original_currency: str | None = Field(default=None, description="Only on foreign charges.")
+
+
+class RepeatedCharges(BaseModel):
+    """Charges that share a descriptor, already counted and added up."""
+
+    descriptor: str
+    merchant_tax_id: str | None
+    count: int
+    total: float
+    currency: str
+    purchased_on: list[str] = Field(description="The day or days they were made, in words.")
+    first_time: str = Field(description="Hour of the first one, at the bank.")
+    last_time: str = Field(description="Hour of the last one, at the bank.")
+    posted_on: list[str] = Field(description="The day or days the bank posted them, in words.")
 
 
 class TransactionsResponse(BaseModel):
     """Recent card movements, newest first."""
 
     count: int
+    timezone: str = Field(description="Every day and hour in this answer is on this clock.")
+    repeated_charges: list[RepeatedCharges]
     transactions: list[CardTransaction]
 
 
