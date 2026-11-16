@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="es">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,6 +25,10 @@
              letter-spacing: .01em; color: var(--accent); text-decoration: none; }
     .brand svg { width: 28px; height: 28px; }
     header form { margin: 0; }
+    .tools { display: flex; align-items: center; gap: .9rem; }
+    .langs { display: flex; gap: .15rem; font-size: .8rem; font-weight: 600; }
+    .langs a { padding: .2rem .45rem; border-radius: 6px; color: var(--muted); text-decoration: none; }
+    .langs a[aria-current] { background: var(--soft); color: var(--accent); }
     .link { background: none; border: 0; padding: 0; color: var(--muted); font: inherit;
             font-size: .9rem; cursor: pointer; text-decoration: underline; }
     main { padding: 1.5rem 1.25rem 2rem; flex: 1; }
@@ -77,14 +81,21 @@
       </svg>
       Banco Magallanes
     </a>
-    {% if signed_in %}
-    <form method="post" action="/app/logout"><button class="link" type="submit">Salir</button></form>
-    {% endif %}
+    <div class="tools">
+      <nav class="langs" aria-label="Idioma / Language">
+        {% for code, href in languages %}
+        <a href="{{ href }}" lang="{{ code }}"{% if code == lang %} aria-current="true"{% endif %}>{{ code|upper }}</a>
+        {% endfor %}
+      </nav>
+      {% if signed_in %}
+      <form method="post" action="/app/logout"><button class="link" type="submit">{{ t.sign_out }}</button></form>
+      {% endif %}
+    </div>
   </header>
   <main>
     {% block content %}{% endblock %}
   </main>
-  <footer>Banco Magallanes es un banco ficticio. Sitio de demostración, sin clientes ni operaciones reales.</footer>
+  <footer>{{ t.footer }}</footer>
 </div>
 {% block script %}{% endblock %}
 </body>

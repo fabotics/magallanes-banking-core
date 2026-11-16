@@ -9,20 +9,21 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 
-from app import app_session, audit
+from app import app_session, audit, i18n
 from app.clock import utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, get_repository
 
 router = APIRouter(tags=["app"], include_in_schema=False)
-NOT_ENROLLED = {
-    "title": "App no disponible",
-    "text": "Esta app no está asociada a un cliente. Abra el enlace que le envió el banco.",
-}
-ERRORS = {
-    "wrong": ("PIN incorrecto. Revise e intente de nuevo.", 401),
-    "locked": ("Demasiados intentos. Espere un minuto e intente de nuevo.", 429),
-}
+# What the PIN screen says after a failed attempt (a key of the text tables) and the status.
+ERRORS = {"wrong": ("pin_wrong", 401), "locked": ("pin_locked", 429)}
+
+
+def not_enrolled(request: Request) -> Response:
+    """The page for a link that names no known customer."""
+    return app_session.message(
+        request, "not_enrolled_title", "not_enrolled_text", status=404, signed_in=False
+    )
 
 
 @router.get("/app", response_class=HTMLResponse)
@@ -36,10 +37,12 @@ def pin_screen(
     """Show the PIN screen, or go straight in when a session is already open."""
     target = app_session.safe_next(next)
     if app_session.current_customer(request, repository) is not None:
-        return RedirectResponse(target, status_code=303)
+        response = RedirectResponse(target, status_code=303)
+        i18n.remember(request, response)
+        return response
     customer = app_session.enrolled_customer(repository, settings, u)
     if customer is None:
-        return app_session.page(request, "message", NOT_ENROLLED, 404)
+        return not_enrolled(request)
     return app_session.page(request, "login", {"customer": customer, "next": target})
 
 
@@ -54,14 +57,15 @@ def sign_in(
     target = app_session.safe_next(fields.get("next"))
     customer = app_session.enrolled_customer(repository, settings, fields.get("u"))
     if customer is None:
-        return app_session.page(request, "message", NOT_ENROLLED, 404)
+        return not_enrolled(request)
     now = utc_now()
     result = app_session.try_pin(repository, customer, fields.get("pin", ""), now)
     audit.record(repository, "/app/login", "POST", customer["id"], f"app_pin_{result}")
     if result != "ok":
         error, status = ERRORS[result]
         context = {"customer": customer, "next": target, "error": error}
-        return app_session.page(request, "login", context, status)
+        back = ("/app", {"u": customer["id"], "next": target})
+        return app_session.page(request, "login", context, status, switch_to=back)
     response = RedirectResponse(target, status_code=303)
     response.set_cookie(
         app_session.COOKIE,

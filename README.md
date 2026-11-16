@@ -19,7 +19,7 @@ A language model follows a prompt most of the time. A bank needs rules that hold
 | Only reversible actions | The only state change on a card is a temporary block. No endpoint moves money |
 | Eligibility is the bank's decision | The API computes which insurance products may be offered, from country, segment, policies held and the vulnerable flag. An offer for anything else is refused |
 | Consent is recorded | Every offer and the customer's answer is stored. A sale is signed by the customer on a page, not by voice |
-| A sale is real only when signed | The proposal reaches the customer at once, by email and in their chat, so they can sign during the call. The agent can read whether it was signed, with the policy number and start date, and can never sign for them. Sent, viewed and signed each leave an audit row |
+| A sale is real only when signed | The proposal reaches the customer at once, by email and in their chat, so they can sign during the call. The agent can read whether it was signed, with the policy number and start date, and can never sign for them. Sent, viewed and signed each leave an audit row, and the signature row records the language and a fingerprint of the contract shown |
 | Never a dead end | A handoff case can be opened without a verified session, with no customer data attached |
 | Everything is recorded | Every `/v1` and `/mcp` call writes an audit row. Tokens and full document numbers are never logged |
 | Only known callers | Every `/v1` and `/mcp` call needs the API key |
@@ -59,7 +59,9 @@ app/
   confirmations.py     identity confirmation requests answered in the bank's app
   app_session.py       the customer app: PIN check, lock, session cookie
   pins.py              PIN hashing
-  contracts.py         contract wording per product, signature checks
+  contracts.py         builds the contract per product and language, fingerprint, signature checks
+  contract_es.py, contract_en.py   the contract wording
+  i18n.py, texts_es.py, texts_en.py   language choice and the sentences of the customer pages
   email.py             optional emails: the proposal, the policy confirmation
   signature.py         what happens when a proposal is seen and signed
   formatting.py        amounts and dates as the customer reads them
@@ -122,7 +124,7 @@ Interactive documentation is served at `/docs`.
 | POST `/v1/notifications/call-summary` | yes | Send a written summary of the call to the customer's messaging channel (Telegram) |
 | GET `/v1/registry/merchants/{tax_id}` | no | The business behind a merchant tax ID |
 | `/app` and `/app/...` | PIN | The customer app, described below |
-| GET, POST `/sign/{token}` | no | Signature page. Signing creates the policy and sends the customer a confirmation |
+| GET, POST `/sign/{token}` | no | Signature page, in Spanish or English. Signing creates the policy and sends the customer a confirmation |
 | POST `/mcp` | no | MCP server with one tool, `lookup_merchant`. Same key, in `X-API-Key` or as a bearer token |
 
 The session token goes in the `X-Session-Token` header (preferred). It is also accepted as a `session_token` query parameter on GET and as a `session_token` body field on POST.
@@ -162,6 +164,10 @@ A wrong answer never says which field was wrong:
 | Identity confirmation | The code of the request, with approve and deny. Anything but an explicit approval is a denial |
 | Contract | Four numbered pages: particulars, cover, exclusions, general conditions. Initials on each page, the full name typed as the signature, a final confirmation. The server checks all three |
 | Result | Policy number and start date. The same details go out by email and to the chat |
+
+The pages exist in Spanish and English. Spanish is the default, `?lang=en` in the link opens them in English, a switch on every screen (the PIN screen and the signing link included) changes it, and the choice lasts for the visit. The contract has the same pages and clauses in both languages. Messages and emails to the customer stay in Spanish, the bank's language.
+
+A signature records what was read: the audit row of `proposal_signed` carries the language the contract was shown in and a SHA-256 fingerprint of that exact wording, and the result screen shows the start of the fingerprint.
 
 A phone app belongs to one customer, so links sent to the chat name the customer (`/app?u=<customer id>&next=<page>`), and the PIN proves it is them. Opened with no customer named, `/app` is the demo customer's app. A session lasts ten minutes in an `HttpOnly`, `SameSite=Lax` cookie, pages are sent with `Cache-Control: no-store`, and redirects never leave `/app`.
 
