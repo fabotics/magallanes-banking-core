@@ -93,7 +93,7 @@ tests/                 one file per area, plus the in-memory repository
 | `quotes` | The premium and limit the bank's rules give one customer for one product, valid 15 days |
 | `insurance_offers` | Every offer made and the customer's answer. The consent record |
 | `proposals` | Proposals sent, with their signing token, status, and when they were viewed and signed |
-| `cases` | Fraud cases, handoffs, complaints and callbacks, numbered `MG-<year>-<sequence>` |
+| `cases` | Fraud cases, handoffs, complaints, callbacks and meetings, numbered `MG-<year>-<sequence>`. Each is a service case or a sales lead |
 | `verification_sessions` | Proof that identity was verified, with an expiry |
 | `verification_attempts` | Used by the lockout rule, for both identity paths |
 | `identity_confirmations` | Requests to confirm identity in the bank's app: code, status, expiry |
@@ -117,7 +117,8 @@ Interactive documentation is served at `/docs`.
 | GET `/v1/accounts/balance` | yes | Available balance per account |
 | GET `/v1/cards/transactions` | yes | Recent card movements, newest first. `days` (default 30), `status` (all, pending, posted) |
 | POST `/v1/cards/block` | yes | Temporary block. Returns a reference |
-| POST `/v1/cases` | handoff: optional | Fraud case, handoff, complaint or callback. Returns a case number |
+| GET `/v1/cases/routes` | no | How the customer can reach a person right now: at once (needs a phone line and service hours), a callback, or a meeting |
+| POST `/v1/cases` | handoff: optional | Fraud case, handoff, complaint, callback or meeting, as a `service` case or a `sales_lead`. Returns a case number |
 | GET `/v1/insurance/eligibility` | yes | Products the bank pre-approves, each with a personal quote (number, premium, limit per event, valid until), or the reason there are none |
 | POST `/v1/insurance/offers` | yes | Record an offer and the answer: accepted, declined, info_requested |
 | POST `/v1/insurance/proposals` | yes | Create the proposal for an offer and send it by email and to the customer's chat. Accepted offers get a signing link |
@@ -268,6 +269,7 @@ Each endpoint maps to one webhook tool on any agent platform that can call HTTP 
 - `eligibility` returns a quote per product. The premium and the limit are computed by the bank's rules from the customer's segment and age (`app/quotes.py`): the agent reads them out and never changes them. The quote number is kept on the offer, the proposal and the contract.
 - The card product covers only what the law does not already place on a card issuer (cash stolen after a withdrawal, emergency money, replacing documents, assistance). Refunding unauthorized charges is the issuer's own duty and is never sold as insurance.
 - When `eligibility` answers `eligible: false`, the agent makes no offer. When `verify` answers `locked: true` or `push` answers `status: locked`, the agent opens a handoff case.
+- Before offering a person, read `cases/routes`. Offer to connect the customer at once only when `talk_now` is available; otherwise offer a callback (ask for a time window) or a meeting (ask for a day and time). A wish to buy or quote something is a `sales_lead`; a problem is a `service` case.
 - A handoff for a caller who is not verified has no session token to send. If your platform refuses a tool call when a header variable is empty, give that handoff its own tool without the `X-Session-Token` header.
 
 ### Merchant lookup over MCP

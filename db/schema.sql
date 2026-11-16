@@ -150,7 +150,7 @@ create table if not exists cases (
         'MG-' || to_char(now(), 'YYYY') || '-' || lpad(nextval('case_number_seq')::text, 6, '0')
     ),
     customer_id uuid references customers (id),
-    type text not null check (type in ('fraud', 'handoff', 'complaint', 'callback')),
+    type text not null,
     priority text not null default 'normal' check (priority in ('low', 'normal', 'high')),
     status text not null default 'open' check (status in ('open', 'closed')),
     summary text not null,
@@ -160,6 +160,14 @@ create table if not exists cases (
     callback_window text,
     created_at timestamptz not null default now()
 );
+
+-- Added after the first release: meetings, and whether a case is a problem or a sale.
+alter table cases add column if not exists category text not null default 'service'
+    check (category in ('service', 'sales_lead'));
+alter table cases add column if not exists meeting_at text;
+alter table cases drop constraint if exists cases_type_check;
+alter table cases add constraint cases_type_check
+    check (type in ('fraud', 'handoff', 'complaint', 'callback', 'meeting'));
 
 create table if not exists verification_sessions (
     id uuid primary key default gen_random_uuid(),
