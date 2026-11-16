@@ -29,6 +29,7 @@ from app.routers.app_pages import waiting_items
 
 router = APIRouter(tags=["app"], include_in_schema=False)
 VARIABLES = "{variables}"
+CUSTOMER = "{customer}"
 LANGUAGE = "{lang}"
 
 
@@ -36,7 +37,10 @@ def embed(settings: Settings, customer: Row, language: str) -> str:
     """Return the widget snippet with the customer's reference and the language filled in."""
     variables = {"channel": "app", "channel_identity": customer["id"]}
     filled = html.escape(json.dumps(variables), quote=True)
-    return settings.assistant_embed_html.replace(VARIABLES, filled).replace(LANGUAGE, language)
+    snippet = settings.assistant_embed_html.replace(VARIABLES, filled)
+    # Some widgets take the reference as an attribute of its own instead of as JSON.
+    snippet = snippet.replace(CUSTOMER, html.escape(customer["id"], quote=True))
+    return snippet.replace(LANGUAGE, language)
 
 
 @router.get("/app/assistant", response_class=HTMLResponse)
