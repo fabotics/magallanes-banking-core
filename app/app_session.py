@@ -93,10 +93,14 @@ def to_login(request: Request) -> RedirectResponse:
     return response
 
 
-def app_link(settings: Settings, customer: Row, path: str) -> str:
-    """Build a link that opens this customer's app on a page, through the PIN screen."""
+def app_link(settings: Settings, customer: Row, path: str, language: str | None = None) -> str:
+    """Build a link that opens this customer's app on a page, through the PIN screen.
+
+    With a language, the link carries it, so the app opens in that language.
+    """
     base = settings.public_base_url.rstrip("/")
-    return f"{base}/app?u={customer['id']}&next={quote(path)}"
+    link = f"{base}/app?u={customer['id']}&next={quote(path)}"
+    return f"{link}&lang={language}" if language else link
 
 
 def enrolled_customer(

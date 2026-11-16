@@ -2,8 +2,8 @@
 
 The language comes from `?lang=` in the link, else from the cookie a previous
 `?lang=` left, else it is Spanish. The cookie has no expiry date, so the
-choice lasts for the visit. Messages and emails to the customer are not
-affected: they are always in the bank's language.
+choice lasts for the visit. Messages and emails to the customer have their
+own rule, in `notices`: they follow the language of the call.
 """
 
 from urllib.parse import urlencode

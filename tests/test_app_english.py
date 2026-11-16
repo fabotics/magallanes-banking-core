@@ -145,9 +145,10 @@ def test_a_signature_records_the_language_and_the_fingerprint_of_what_was_shown(
     assert "Signature received" in done.text and "Document fingerprint" in done.text
     assert detail["language"] == "en" and len(detail["document_hash"]) == 64
     assert detail["document_hash"][:16] in done.text
-    # The messages to the customer stay in the bank's language.
-    assert "quedó contratado" in telegram[-1]["json"]["text"]
-    assert "Card fraud" not in str(telegram)
+    # The confirmation is written in the language she read and signed in.
+    text = telegram[-1]["json"]["text"]
+    assert "Your Card protection and assistance insurance is now active" in text
+    assert "In force from" in text and "Monthly premium: CLP 2,690" in text
 
 
 def test_the_fingerprint_is_of_the_wording_in_that_language(

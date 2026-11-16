@@ -25,6 +25,11 @@ class PushRequest(BaseModel):
         default=None, description="The caller's phone number. Matched to the phone on file."
     )
     conversation_id: str | None = Field(default=None, description="Caller's conversation ID.")
+    language: Literal["es", "en"] | None = Field(
+        default=None,
+        description="Language the call is held in. Messages and links to the customer follow it. "
+        "Absent: the language the bank has on file for the customer.",
+    )
 
     @model_validator(mode="after")
     def names_a_customer(self) -> "PushRequest":

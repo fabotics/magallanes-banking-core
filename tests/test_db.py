@@ -37,7 +37,7 @@ def test_update_changes_only_matching_rows(repository: InMemoryRepository) -> No
 def test_delete_all_empties_one_table(repository: InMemoryRepository) -> None:
     repository.delete_all("transactions")
     assert repository.select("transactions") == []
-    assert len(repository.select("customers")) == 10
+    assert len(repository.select("customers")) == 11
 
 
 def test_repository_requires_configuration() -> None:

@@ -29,40 +29,45 @@ def test_curp_check_digit_matches_a_known_value() -> None:
     assert curp_check_digit("HEGG560427MVZRRL0") == "4"
 
 
-def test_ten_fictional_customers_across_four_countries() -> None:
+def test_eleven_fictional_customers_across_four_countries() -> None:
     customers = build_seed(WEDNESDAY)["customers"]
-    assert len(customers) == 10
+    assert len(customers) == 11
     assert {row["country"] for row in customers} == {"CL", "PE", "CO", "MX"}
     assert all(row["email"].endswith("@example.com") for row in customers)
-    assert len({row["document_number"] for row in customers}) == 10
+    assert len({row["document_number"] for row in customers}) == 11
 
 
-def test_demo_email_goes_to_the_golden_path_customer_only() -> None:
+def test_demo_email_goes_to_the_two_demo_customers_only() -> None:
     customers = build_seed(WEDNESDAY, demo_email="demo@example.org")["customers"]
     assert [row["first_name"] for row in customers if row["email"] == "demo@example.org"] == [
-        "Marta"
+        "Emma",
+        "Marta",
     ]
 
 
 @pytest.mark.parametrize("today", ONE_WEEK)
-def test_the_evening_is_four_saturday_rounds_all_posted_on_monday(today: date) -> None:
+@pytest.mark.parametrize(("key", "count", "total"), [("emma", 5, 43300), ("marta", 4, 34900)])
+def test_the_evening_is_saturday_rounds_all_posted_on_monday(
+    today: date, key: str, count: int, total: int
+) -> None:
     seed = build_seed(today)
-    rounds = [row for row in seed["transactions"] if row["merchant_tax_id"]]
-    assert len(rounds) == 4 and sum(row["amount"] for row in rounds) == 34900
-    assert {row["card_id"] for row in rounds} == {seed_id("card/marta")}
+    at_the_place = [row for row in seed["transactions"] if row["merchant_tax_id"]]
+    assert len(at_the_place) == 9
+    rounds = [row for row in at_the_place if row["card_id"] == seed_id(f"card/{key}")]
+    assert len(rounds) == count and sum(row["amount"] for row in rounds) == total
     assert {row["merchant_tax_id"] for row in rounds} == {RESTAURANT_TAX_ID}
     assert {row["descriptor"] for row in rounds} == {"MERPAGO*INVGASTRO PROV"}
     made = [datetime.fromisoformat(row["transaction_at"]) for row in rounds]
     posted = {datetime.fromisoformat(row["posted_at"]).date() for row in rounds}
-    assert {moment.weekday() for moment in made} == {5} and min(m.hour for m in made) >= 21
-    # One posting day for all four: the Monday after, never later than today.
+    assert {moment.weekday() for moment in made} == {5} and min(m.hour for m in made) >= 20
+    # One posting day for all of them: the Monday after, never later than today.
     assert len(posted) == 1 and posted.pop().weekday() == 0
     assert 0 <= (today - datetime.fromisoformat(rounds[0]["posted_at"]).date()).days <= 6
 
 
 def test_every_customer_has_a_phone_on_file() -> None:
     phones = [row["phone"] for row in build_seed(WEDNESDAY)["customers"]]
-    assert len(set(phones)) == 10 and all(phone.startswith("+") for phone in phones)
+    assert len(set(phones)) == 11 and all(phone.startswith("+") for phone in phones)
 
 
 def test_golden_path_customer_has_one_pending_charge_and_no_policy() -> None:

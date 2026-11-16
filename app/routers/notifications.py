@@ -8,7 +8,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request
 
-from app import audit
+from app import audit, notices
 from app.config import Settings, get_settings
 from app.db import Repository, get_repository
 from app.messaging import send_telegram
@@ -34,7 +34,8 @@ def send_call_summary(
         audit.note(request, outcome="summary_no_channel")
         return CallSummaryResponse(sent=False, channel="none")
 
-    text = f"Banco Magallanes\nResumen de tu llamada:\n\n{body.summary}"
+    language = notices.language_for(customer, body.language)
+    text = notices.chat(language, "summary") + f"\n\n{body.summary}"
     sent = send_telegram(settings, chat_id, text)
     # The summary text is customer data, so only the result is recorded.
     audit.note(request, outcome="summary_sent" if sent else "summary_not_sent")
