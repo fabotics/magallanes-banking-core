@@ -29,30 +29,33 @@ def test_curp_check_digit_matches_a_known_value() -> None:
     assert curp_check_digit("HEGG560427MVZRRL0") == "4"
 
 
-def test_eleven_fictional_customers_across_four_countries() -> None:
+def test_twelve_fictional_customers_across_four_countries() -> None:
     customers = build_seed(WEDNESDAY)["customers"]
-    assert len(customers) == 11
+    assert len(customers) == 12
     assert {row["country"] for row in customers} == {"CL", "PE", "CO", "MX"}
     assert all(row["email"].endswith("@example.com") for row in customers)
-    assert len({row["document_number"] for row in customers}) == 11
+    assert len({row["document_number"] for row in customers}) == 12
 
 
-def test_demo_email_goes_to_the_two_demo_customers_only() -> None:
+def test_demo_email_goes_to_the_demo_customers_only() -> None:
     customers = build_seed(WEDNESDAY, demo_email="demo@example.org")["customers"]
     assert [row["first_name"] for row in customers if row["email"] == "demo@example.org"] == [
+        "Daniel",
         "Emma",
         "Marta",
     ]
 
 
 @pytest.mark.parametrize("today", ONE_WEEK)
-@pytest.mark.parametrize(("key", "count", "total"), [("emma", 5, 43300), ("marta", 4, 34900)])
+@pytest.mark.parametrize(
+    ("key", "count", "total"), [("daniel", 5, 38400), ("emma", 5, 43300), ("marta", 4, 34900)]
+)
 def test_the_evening_is_saturday_rounds_all_posted_on_monday(
     today: date, key: str, count: int, total: int
 ) -> None:
     seed = build_seed(today)
     at_the_place = [row for row in seed["transactions"] if row["merchant_tax_id"]]
-    assert len(at_the_place) == 9
+    assert len(at_the_place) == 14
     rounds = [row for row in at_the_place if row["card_id"] == seed_id(f"card/{key}")]
     assert len(rounds) == count and sum(row["amount"] for row in rounds) == total
     assert {row["merchant_tax_id"] for row in rounds} == {RESTAURANT_TAX_ID}
@@ -67,7 +70,7 @@ def test_the_evening_is_saturday_rounds_all_posted_on_monday(
 
 def test_every_customer_has_a_phone_on_file() -> None:
     phones = [row["phone"] for row in build_seed(WEDNESDAY)["customers"]]
-    assert len(set(phones)) == 11 and all(phone.startswith("+") for phone in phones)
+    assert len(set(phones)) == 12 and all(phone.startswith("+") for phone in phones)
 
 
 def test_golden_path_customer_has_one_pending_charge_and_no_policy() -> None:
@@ -105,3 +108,13 @@ def test_every_seed_table_and_column_exists_in_the_schema() -> None:
         columns = {line.split()[0] for line in match.group(1).splitlines() if line.strip()}
         for row in rows:
             assert set(row) <= columns, f"{table}: {set(row) - columns} not in schema"
+
+
+def test_the_main_demo_customer_speaks_english_and_is_in_the_premium_segment() -> None:
+    seed = build_seed(WEDNESDAY)
+    daniel = next(row for row in seed["customers"] if row["first_name"] == "Daniel")
+    assert daniel["document_number"] == "356281942" and daniel["country"] == "CL"
+    assert daniel["preferred_language"] == "en" and daniel["segment"] == "premium"
+    cards = [row for row in seed["cards"] if row["customer_id"] == daniel["id"]]
+    assert [(card["last4"], card["status"]) for card in cards] == [("5519", "active")]
+    assert not [row for row in seed["policies"] if row["customer_id"] == daniel["id"]]

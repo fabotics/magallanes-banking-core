@@ -14,12 +14,15 @@ from seed.helpers import app_pin, curp_check_digit, rut, seed_id
 CURRENCY_BY_COUNTRY = {"CL": "CLP", "PE": "PEN", "CO": "COP", "MX": "MXN"}
 
 SOFIA_CURP = "ROGS900514MDFBRF0"
-# The two customers a demo is run with: an English speaker and a Spanish speaker.
-DEMO_CUSTOMERS = ("emma", "marta")
+# The customers a demo is run with: two English speakers and a Spanish speaker. The first
+# one is the main one: a demo phone number, when given, goes on file for that customer.
+DEMO_CUSTOMERS = ("daniel", "emma", "marta")
 
 # key, document type, document number, first name, last name, birth date,
 # country, language, segment, vulnerable
 PEOPLE = [
+    ("daniel", "RUT", rut(35628194), "Daniel", "Keller", "1992-06-21",
+     "CL", "en", "premium", False),
     ("emma", "RUT", rut(35897932), "Emma", "Whitfield", "1988-04-09",
      "CL", "en", "premium", False),
     ("marta", "RUT", rut(31415926), "Marta", "Rojas Fuentes", "1986-03-14",
@@ -46,7 +49,7 @@ PEOPLE = [
 
 # The phone the bank has on file, in international format. All invented.
 PHONES = {
-    "emma": "+56955503589",
+    "daniel": "+56955506280", "emma": "+56955503589",
     "marta": "+56955501426", "pedro": "+56955502718", "carolina": "+56955503161",
     "jorge": "+56955500577", "lucia": "+56955504141", "rosa": "+51955500017",
     "diego": "+51955500025", "camila": "+573555000123", "andres": "+573555000456",
@@ -55,6 +58,7 @@ PHONES = {
 
 # customer key, account type, available balance
 ACCOUNTS = [
+    ("daniel", "checking", 1876200), ("daniel", "savings", 4310000),
     ("emma", "checking", 2318400), ("emma", "savings", 5420000),
     ("marta", "checking", 1284500), ("marta", "savings", 3150000),
     ("pedro", "checking", 742300), ("carolina", "sight", 96400),
@@ -66,6 +70,7 @@ ACCOUNTS = [
 
 # customer key, last four digits, brand, type, status, daily limit
 CARDS = [
+    ("daniel", "5519", "mastercard", "credit", "active", 2000000),
     ("emma", "6302", "visa", "credit", "active", 2000000),
     ("marta", "4821", "visa", "credit", "active", 1500000),
     ("pedro", "7730", "mastercard", "credit", "active", 1200000),
@@ -101,7 +106,7 @@ def build_customers(
 ) -> list[dict]:
     """Build the customer rows.
 
-    The two demo customers get the demo email and Telegram chat when given,
+    The demo customers get the demo email and Telegram chat when given,
     so proposals and call summaries reach a real inbox during a demo. Every
     customer gets an app PIN derived from `pin_secret`; without it nobody can
     sign in to the app. `demo_phone` replaces the phone on file of the first
