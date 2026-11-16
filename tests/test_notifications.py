@@ -72,7 +72,7 @@ def test_audit_records_the_result_but_not_the_text_or_the_token(
     assert "restaurante" not in str(row) and BOT_TOKEN not in str(row)
 
 
-def test_seed_gives_the_demo_chat_to_the_golden_path_customer_only() -> None:
+def test_seed_gives_the_demo_chat_to_the_two_demo_customers_only() -> None:
     customers = build_seed(demo_chat_id="987654")["customers"]
     with_chat = [row["first_name"] for row in customers if row["telegram_chat_id"]]
-    assert with_chat == ["Marta"]
+    assert with_chat == ["Emma", "Marta"]

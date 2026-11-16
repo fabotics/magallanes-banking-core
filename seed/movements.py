@@ -1,9 +1,9 @@
 """Seed card transactions, dated relative to the day the seed runs.
 
-The story stays fresh on any day: the golden-path customer spent a Saturday
-evening at one restaurant, where each round was paid on its own, and the
-restaurant presented the whole weekend to the bank on Monday. So she sees
-several charges dated Monday for things she bought on Saturday night.
+The story stays fresh on any day: each of the two demo customers spent a
+Saturday evening at the same restaurant and bar, where each round was paid on
+its own, and the place presented the whole weekend to the bank on Monday. So
+she sees several charges dated Monday for things she bought on Saturday night.
 Descriptors are cryptic on purpose, the way they look on a real statement.
 """
 
@@ -28,6 +28,7 @@ SUPPORTING_CUSTOMERS = ["carolina", "jorge", "lucia", "rosa", "diego", "camila",
 
 # The evening at the restaurant: hour, minute and amount of each round.
 EVENING_ROUNDS = [(21, 52, 8400), (22, 37, 11200), (23, 14, 8400), (23, 58, 6900)]
+EMMA_ROUNDS = [(20, 41, 9800), (21, 34, 7600), (22, 18, 12400), (23, 5, 7600), (23, 49, 5900)]
 
 
 def posting_monday(today: date) -> date:
@@ -80,13 +81,22 @@ def build_transactions(today: date) -> list[dict]:
 
     monday = posting_monday(today)
     saturday = monday - timedelta(days=2)
-    # Marta, golden path: four rounds on Saturday night, all posted on Monday.
+    # Emma and Marta, golden path: rounds on Saturday night, all posted on Monday.
     rows = [
-        movement("marta", f"restaurant-{number}", saturday, hour, minute, amount,
+        movement(key, f"restaurant-{number}", saturday, hour, minute, amount,
                  "MERPAGO*INVGASTRO PROV", "5812", tax_id=RESTAURANT_TAX_ID, posted=monday)
-        for number, (hour, minute, amount) in enumerate(EVENING_ROUNDS, start=1)
+        for key, rounds in (("emma", EMMA_ROUNDS), ("marta", EVENING_ROUNDS))
+        for number, (hour, minute, amount) in enumerate(rounds, start=1)
     ]  # fmt: skip
     rows += [
+        movement("emma", "ride", ago(1), 19, 40, 7200, "APP*VIAJES STGO", "4121",
+                 channel="ecommerce", pending=True),
+        movement("emma", "supermarket", ago(3), 18, 25, 52340, "SUPERMERC DON LUCHO 012", "5411"),
+        movement("emma", "bookshop", ago(6), 13, 10, 18900, "LIBRERIA DEL PARQUE PROV", "5942"),
+        movement("emma", "streaming", ago(12), 6, 0, 9480, "STREAMFLIX.COM 866-000", "4899",
+                 channel="ecommerce", country="US", usd=9.99),
+        movement("emma", "airline", ago(18), 10, 22, 412600, "AEROSUR WEB SCL", "4511",
+                 channel="ecommerce"),
         movement("marta", "ride", ago(1), 20, 15, 6400, "APP*VIAJES STGO", "4121",
                  channel="ecommerce", pending=True),
         movement("marta", "supermarket", ago(3), 19, 5, 37250, "SUPERMERC DON LUCHO 012", "5411"),

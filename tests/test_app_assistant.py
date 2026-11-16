@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from app.config import Settings, get_settings
 from seed.helpers import app_pin, seed_id
-from tests.conftest import API_KEY, PIN_SECRET, TEST_API_KEY
+from tests.conftest import API_KEY, APP_OWNER, PIN_SECRET, TEST_API_KEY
 
 SNIPPET = "<chat-widget variables='{variables}'></chat-widget><script src=\"https://widget.example/w.js\"></script>"
 MARTA_ID = seed_id("customer/marta")
@@ -18,7 +18,7 @@ MARTA_ID = seed_id("customer/marta")
 @pytest.fixture
 def with_widget(app: FastAPI) -> None:
     app.dependency_overrides[get_settings] = lambda: Settings(
-        _env_file=None, bank_api_key=TEST_API_KEY, assistant_embed_html=SNIPPET
+        _env_file=None, bank_api_key=TEST_API_KEY, assistant_embed_html=SNIPPET, **APP_OWNER
     )
 
 

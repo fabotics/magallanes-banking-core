@@ -53,6 +53,11 @@ class ProposalRequest(BaseModel):
 
     offer_id: str
     channel: Literal["email"] = "email"
+    language: Literal["es", "en"] | None = Field(
+        default=None,
+        description="Language the call is held in. Messages and links to the customer follow it. "
+        "Absent: the language the bank has on file for the customer.",
+    )
     session_token: str | None = Field(
         default=None, description="Only if the X-Session-Token header is not used."
     )

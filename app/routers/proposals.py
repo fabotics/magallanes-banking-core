@@ -12,14 +12,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request
 
-from app import audit, quotes, signature, waiting
+from app import audit, notices, quotes, signature, waiting
 from app.app_session import app_link
 from app.clock import bank_date, parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
-from app.email import mask_email, proposal_email, send_email
+from app.email import mask_email, send_email
 from app.errors import ApiError
-from app.formatting import money
 from app.messaging import send_telegram
 from app.schemas_insurance import ProposalRequest, ProposalResponse, ProposalStatusResponse
 from app.security import require_session, session_from_request
@@ -27,24 +26,28 @@ from app.security import require_session, session_from_request
 router = APIRouter(tags=["insurance"])
 
 
-def signing_link(settings: Settings, proposal: Row) -> str | None:
+def signing_link(settings: Settings, proposal: Row, language: str | None = None) -> str | None:
     """Return the address of the signing page, or None for a proposal that is only details."""
     if not proposal["signing_token"]:
         return None
-    return f"{settings.public_base_url.rstrip('/')}/sign/{proposal['signing_token']}"
+    link = f"{settings.public_base_url.rstrip('/')}/sign/{proposal['signing_token']}"
+    return f"{link}?lang={language}" if language else link
 
 
-def send_to_messaging(settings: Settings, customer: Row, product: Row, proposal: Row) -> bool:
+def send_to_messaging(
+    settings: Settings, customer: Row, product: Row, proposal: Row, language: str
+) -> bool:
     """Send a link to the contract in the app, with the product and premium, to the chat."""
     if not proposal["signing_token"] or not customer["telegram_chat_id"]:
         return False
-    link = app_link(settings, customer, f"/app/proposals/{proposal['proposal_number']}")
-    text = (
-        "Banco Magallanes\n"
-        f"Su propuesta de {product['name']} está lista para firmar.\n"
-        f"Prima mensual: {money(product['monthly_premium'], product['currency'])}\n\n"
-        f"Revise y firme en la app: {link}\n"
-        "Nada queda contratado hasta que usted firme."
+    page = f"/app/proposals/{proposal['proposal_number']}"
+    name, _, premium = notices.priced(product, language)
+    text = notices.chat(
+        language,
+        "proposal",
+        name=name,
+        premium=premium,
+        link=app_link(settings, customer, page, language),
     )
     return send_telegram(settings, customer["telegram_chat_id"], text)
 
@@ -93,10 +96,12 @@ def create_proposal(
         )
     link = signing_link(settings, proposal)
     if not existing:
+        language = notices.language_for(customer, body.language)
         product = quotes.for_proposal(repository, proposal)
-        subject = f"Banco Magallanes: {product['name']}"
-        email_sent = send_email(settings, customer["email"], subject, proposal_email(product, link))
-        message_sent = send_to_messaging(settings, customer, product, proposal)
+        subject = f"Banco Magallanes: {notices.priced(product, language)[0]}"
+        html = notices.proposal_email(product, signing_link(settings, proposal, language), language)
+        email_sent = send_email(settings, customer["email"], subject, html)
+        message_sent = send_to_messaging(settings, customer, product, proposal, language)
 
     audit.note(
         request,

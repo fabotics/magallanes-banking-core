@@ -14,6 +14,7 @@ import secrets
 import uuid
 from datetime import datetime, timedelta
 
+from app import notices
 from app.app_session import app_link
 from app.clock import parse_time
 from app.config import Settings
@@ -81,18 +82,15 @@ def current_status(confirmation: Row, now: datetime) -> str:
     return confirmation["status"]
 
 
-def notify(settings: Settings, customer: Row, confirmation: Row) -> bool:
+def notify(
+    settings: Settings, customer: Row, confirmation: Row, language: str | None = None
+) -> bool:
     """Tell the customer, on their messaging channel, that a confirmation is waiting."""
     if not customer["telegram_chat_id"]:
         return False
-    link = app_link(settings, customer, f"/app/confirmations/{confirmation['id']}")
-    text = (
-        "Banco Magallanes\n"
-        "Alguien en una llamada con Banco Magallanes pide confirmar su identidad. "
-        f"Código {confirmation['code']}\n\n"
-        f"Abra la app para aprobar o rechazar: {link}\n"
-        "Si usted no está en una llamada con el banco, rechace la solicitud."
-    )
+    language = notices.language_for(customer, language)
+    link = app_link(settings, customer, f"/app/confirmations/{confirmation['id']}", language)
+    text = notices.chat(language, "confirm", code=confirmation["code"], link=link)
     return send_telegram(settings, customer["telegram_chat_id"], text)
 
 
