@@ -3,6 +3,8 @@
 Responses are small and speakable, because the caller is a voice agent.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -84,3 +86,48 @@ class TransactionsResponse(BaseModel):
 
     count: int
     transactions: list[CardTransaction]
+
+
+class BlockCardRequest(BaseModel):
+    """Ask for a temporary block on one of the customer's cards."""
+
+    card_last4: str = Field(description="Last four digits of the card to block.")
+    reason: str = Field(description="Why, in a few words. For example: suspected fraud.")
+    session_token: str | None = Field(
+        default=None, description="Only if the X-Session-Token header is not used."
+    )
+
+
+class BlockCardResponse(BaseModel):
+    """The card's state after the request, with a reference the agent can read back."""
+
+    card_status: str
+    reference: str
+    how_to_unblock: str
+
+
+class CaseRequest(BaseModel):
+    """Open a case for the bank's staff: fraud, handoff to a person, complaint or callback."""
+
+    type: Literal["fraud", "handoff", "complaint", "callback"]
+    summary: str = Field(description="What happened, so the customer never repeats the story.")
+    priority: Literal["low", "normal", "high"] | None = Field(
+        default=None, description="Defaults to high for fraud and normal otherwise."
+    )
+    transaction_ids: list[str] = Field(default=[], description="Transactions the case is about.")
+    conversation_id: str | None = None
+    callback_window: str | None = Field(
+        default=None, description="When the customer prefers to be called."
+    )
+    session_token: str | None = Field(
+        default=None, description="Omit when identity could not be verified (handoff only)."
+    )
+
+
+class CaseResponse(BaseModel):
+    """Where the case went and when the customer can expect an answer."""
+
+    case_number: str
+    queue: str
+    sla_hours: int
+    callback_window: str | None = None
