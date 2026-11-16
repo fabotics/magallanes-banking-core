@@ -77,7 +77,11 @@
   .pin { width: 100%; padding: .85rem 0 .85rem .6em; font: 600 1.9rem/1 var(--display);
          text-align: center; letter-spacing: .6em; border: 1.5px solid var(--line);
          border-radius: 14px; margin: 1.1rem 0; background: #fff; color: var(--ink); }
-  .pin:focus, .signature:focus { outline: 2px solid var(--copper); outline-offset: 2px; }
+  .leave { margin-top: 1.6rem; }
+  .pin-label { display: block; margin: .9rem 0 -.8rem; }
+  .field { width: 100%; padding: .8rem .9rem; margin: .35rem 0 0; font: 600 1.05rem/1.2 var(--text);
+           border: 1.5px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); }
+  .field:focus, .pin:focus, .signature:focus { outline: 2px solid var(--copper); outline-offset: 2px; }
   .error { color: var(--bad); font-weight: 700; }
   .ok { color: var(--ok); font-weight: 700; }
   dl { display: grid; grid-template-columns: auto 1fr; gap: .45rem 1rem; margin: 1rem 0; }

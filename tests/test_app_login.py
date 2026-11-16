@@ -1,4 +1,4 @@
-"""The bank's app: PIN screen, lock after three wrong PINs, session cookie, redirects."""
+"""The bank's app: signing in with ID number and PIN, the remembered customer, the lock."""
 
 from datetime import timedelta
 
@@ -8,6 +8,7 @@ from app.clock import utc_now
 from app.pins import hash_pin
 from seed.data import build_seed
 from seed.helpers import app_pin, seed_id
+from seed.people import PEOPLE
 from tests.conftest import PIN_SECRET
 from tests.fake_db import InMemoryRepository
 
@@ -17,14 +18,85 @@ WRONG_PIN = "0000" if MARTA_PIN != "0000" else "1111"
 
 
 def sign_in(client: TestClient, pin: str = MARTA_PIN, **fields: str):
-    return client.post("/app/login", data={"pin": pin, **fields}, follow_redirects=False)
+    """Post the PIN screen of a customer the app already knows (Marta unless told otherwise)."""
+    data = {"u": MARTA_ID, "pin": pin, **fields}
+    return client.post("/app/login", data=data, follow_redirects=False)
 
 
-def test_the_pin_screen_shows_only_a_first_name(client: TestClient) -> None:
+def full_form(client: TestClient, document: str, pin: str):
+    """Post the first-visit form: ID number and PIN."""
+    return client.post(
+        "/app/login", data={"document": document, "pin": pin}, follow_redirects=False
+    )
+
+
+def test_the_first_visit_asks_for_the_id_number_and_the_pin(client: TestClient) -> None:
     page = client.get("/app")
+    assert page.status_code == 200 and 'name="document"' in page.text
+    assert "Ingrese a su banco" in page.text and 'name="pin"' in page.text
+    # Nobody is named before someone signs in.
+    assert "Hola," not in page.text and "Marta" not in page.text and "Emma" not in page.text
+    assert page.headers["cache-control"] == "no-store"
+
+
+def test_every_seed_customer_can_sign_in_with_id_number_and_pin(client: TestClient) -> None:
+    for key, _, document, first_name, *_ in PEOPLE:
+        response = full_form(client, document, app_pin(PIN_SECRET, key))
+        assert response.status_code == 303 and response.headers["location"] == "/app/home"
+        assert f"{first_name} " in client.get("/app/home").text
+        client.post("/app/logout")
+    # The ID number can be typed the way it is printed.
+    assert full_form(client, "31.415.926-8", MARTA_PIN).status_code == 303
+
+
+def test_the_browser_remembers_the_last_customer_and_asks_for_the_pin_only(
+    client: TestClient, repository: InMemoryRepository
+) -> None:
+    full_form(client, "358979327", app_pin(PIN_SECRET, "emma"))
+    # The session ends without a log out: the app still knows whose it is.
+    past = (utc_now() - timedelta(seconds=1)).isoformat()
+    repository.update("app_sessions", {}, {"expires_at": past})
+    page = client.get("/app?lang=en").text
+    assert "Hello, Emma" in page and 'name="document"' not in page
+    assert "Not Emma? Log in as someone else" in page
+    assert 'href="/app?other=1&amp;next=%2Fapp%2Fhome"' in page
+    other = client.get("/app?other=1").text
+    assert 'name="document"' in other and "Emma" not in other
+    emma_pin = {"u": seed_id("customer/emma"), "pin": app_pin(PIN_SECRET, "emma")}
+    assert client.post("/app/login", data=emma_pin, follow_redirects=False).status_code == 303
+
+
+def test_logging_out_returns_to_the_full_form(client: TestClient) -> None:
+    sign_in(client)
+    assert "Cerrar sesión" in client.get("/app/home").text
+    response = client.post("/app/logout", follow_redirects=False)
+    assert response.headers["location"] == "/app"
+    page = client.get("/app").text
+    assert 'name="document"' in page and "Marta" not in page
+
+
+def test_the_full_form_never_says_which_part_was_wrong(
+    client: TestClient, repository: InMemoryRepository
+) -> None:
+    unknown = full_form(client, "11.111.111-1", MARTA_PIN)
+    wrong_pin = full_form(client, "314159268", WRONG_PIN)
+    for response in (unknown, wrong_pin):
+        assert response.status_code == 401 and "El documento o el PIN no coinciden" in response.text
+        assert "Marta" not in response.text and 'name="document"' in response.text
+    outcomes = [row["outcome"] for row in repository.select("audit_log")]
+    assert outcomes[-2:] == ["app_login_unknown", "app_pin_wrong"]
+    # Wrong PINs through the full form count towards the same lock.
+    full_form(client, "314159268", WRONG_PIN)
+    locked = full_form(client, "314159268", WRONG_PIN)
+    assert locked.status_code == 429 and "Demasiados intentos" in locked.text
+    assert full_form(client, "314159268", MARTA_PIN).status_code == 429
+
+
+def test_a_link_from_the_bank_shows_only_a_first_name(client: TestClient) -> None:
+    page = client.get(f"/app?u={MARTA_ID}")
     assert page.status_code == 200 and "Hola, Marta" in page.text
     assert "Rojas" not in page.text and "4821" not in page.text
-    assert page.headers["cache-control"] == "no-store"
+    assert "¿No es Marta? Ingresar con otra persona" in page.text
 
 
 def test_the_right_pin_opens_a_session_and_the_home_page(
@@ -91,6 +163,8 @@ def test_the_link_names_the_customer_whose_app_it_is(client: TestClient) -> None
     # Marta's PIN does not open Pedro's app.
     assert sign_in(client, u=pedro).status_code == 401
     assert sign_in(client, app_pin(PIN_SECRET, "pedro"), u=pedro).status_code == 303
+    # A link for someone else does not open the app of whoever is signed in.
+    assert "Hola, Marta" in client.get(f"/app?u={MARTA_ID}").text
 
 
 def test_without_a_pin_secret_nobody_can_sign_in(client: TestClient) -> None:

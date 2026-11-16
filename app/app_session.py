@@ -1,8 +1,10 @@
 """The signed-in state of the bank's app: which customer, the PIN check, the session cookie.
 
-The app is a set of web pages that stand in for a bank's phone app. A phone
-app is enrolled to one customer, so the link names the customer and the PIN
-proves it is them. Three wrong PINs lock the app for one minute.
+The app is a set of web pages that stand in for a bank's phone app. The
+first visit asks for the ID number and the PIN. After that the browser
+remembers who signed in, like a phone app enrolled to one customer, and asks
+for the PIN only. A link the bank sends names the customer the same way.
+Three wrong PINs lock the app for one minute.
 """
 
 import secrets
@@ -23,6 +25,10 @@ from app.db import Repository, Row
 from app.pins import pin_matches
 
 COOKIE = "mg_app"
+# Who signed in last on this browser. It only chooses the name the PIN screen greets:
+# it opens nothing, the PIN does.
+REMEMBER_COOKIE = "mg_who"
+REMEMBER_SECONDS = 60 * 60 * 24 * 365
 SESSION_LIFETIME = timedelta(minutes=10)
 MAX_WRONG_PINS = 3
 LOCK_TIME = timedelta(minutes=1)
@@ -103,19 +109,19 @@ def app_link(settings: Settings, customer: Row, path: str, language: str | None 
     return f"{link}&lang={language}" if language else link
 
 
-def enrolled_customer(
-    repository: Repository, settings: Settings, customer_id: str | None
-) -> Row | None:
-    """Return the customer this app belongs to: named in the link, else the demo customer."""
-    if customer_id:
-        try:
-            filters = {"id": str(uuid.UUID(customer_id))}
-        except ValueError:
-            return None
-    else:
-        filters = {"document_number": settings.demo_app_document}
+def customer_by_id(repository: Repository, customer_id: str | None) -> Row | None:
+    """Return the customer with this id, or None for a missing or malformed one."""
+    try:
+        filters = {"id": str(uuid.UUID(customer_id or ""))}
+    except ValueError:
+        return None
     customers = repository.select("customers", filters)
     return customers[0] if customers else None
+
+
+def remembered_customer(request: Request, repository: Repository) -> Row | None:
+    """Return the customer who last signed in on this browser, if the browser remembers one."""
+    return customer_by_id(repository, request.cookies.get(REMEMBER_COOKIE))
 
 
 def try_pin(repository: Repository, customer: Row, pin: str, now: datetime) -> str:

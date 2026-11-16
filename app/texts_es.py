@@ -2,6 +2,7 @@
 
 TEXTS = {
     "sign_out": "Salir",
+    "log_out": "Cerrar sesión",
     "footer": "Banco Magallanes es un banco ficticio. Sitio de demostración, sin clientes ni "
     "operaciones reales.",
     "back_home": "Volver al inicio",
@@ -28,6 +29,11 @@ TEXTS = {
     "pin_enter": "Ingresar",
     "pin_warning": "El banco nunca le pedirá su PIN por teléfono, correo ni mensajería.",
     "pin_wrong": "PIN incorrecto. Revise e intente de nuevo.",
+    "login_heading": "Ingrese a su banco",
+    "login_prompt": "Escriba su RUT o número de documento y su PIN de cuatro dígitos.",
+    "document_label": "RUT o número de documento",
+    "login_wrong": "El documento o el PIN no coinciden. Revise e intente de nuevo.",
+    "not_you": "¿No es {name}? Ingresar con otra persona",
     "pin_locked": "Demasiados intentos. Espere un minuto e intente de nuevo.",
     "not_enrolled_title": "App no disponible",
     "not_enrolled_text": "Esta app no está asociada a un cliente. Abra el enlace que le envió "

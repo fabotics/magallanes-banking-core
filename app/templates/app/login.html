@@ -1,15 +1,31 @@
 {% extends "app/base.html" %}
 {% block title %}{{ t.login_title }}{% endblock %}
 {% block content %}
+  {% if customer %}
+  {# The app knows whose it is: only the PIN is asked. #}
   <h1>{{ t.hello.format(name=customer.first_name) }}</h1>
   <p class="muted">{{ t.pin_prompt }}</p>
+  {% else %}
+  <h1>{{ t.login_heading }}</h1>
+  <p class="muted">{{ t.login_prompt }}</p>
+  {% endif %}
   <form method="post" action="/app/login">
-    <input type="hidden" name="u" value="{{ customer.id }}">
     <input type="hidden" name="next" value="{{ next }}">
-    <input class="pin" type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}"
-           maxlength="4" autocomplete="off" aria-label="PIN" required autofocus>
+    {% if customer %}
+    <input type="hidden" name="u" value="{{ customer.id }}">
+    {% else %}
+    <label class="small muted" for="document">{{ t.document_label }}</label>
+    <input class="field" id="document" type="text" name="document" value="{{ document }}"
+           maxlength="20" autocomplete="off" autocapitalize="characters" required autofocus>
+    <label class="small muted pin-label" for="pin">PIN</label>
+    {% endif %}
+    <input class="pin" id="pin" type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}"
+           maxlength="4" autocomplete="off" aria-label="PIN" required{% if customer %} autofocus{% endif %}>
     {% if error %}<p class="error" role="alert">{{ t[error] }}</p>{% endif %}
     <button type="submit">{{ t.pin_enter }}</button>
   </form>
+  {% if customer %}
+  <p class="small"><a href="{{ other }}">{{ t.not_you.format(name=customer.first_name) }}</a></p>
+  {% endif %}
   <p class="muted small">{{ t.pin_warning }}</p>
 {% endblock %}
