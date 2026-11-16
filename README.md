@@ -166,12 +166,17 @@ A wrong answer never says which field was wrong:
 | Identity confirmation | The code of the request, with approve and deny. Anything but an explicit approval is a denial |
 | Contract | Four numbered pages: particulars, cover, exclusions, general conditions. Initials on each page, the full name typed as the signature, a final confirmation. The server checks all three |
 | Result | Policy number and start date. The same details go out by email and to the chat |
+| Assistant | Talk to the bank from inside the app. Only behind the PIN, and only when a conversation widget is configured. Confirmations and proposals the assistant sends show up on the same screen |
+
+On a wide screen the app is drawn inside a phone frame; on a phone it fills the screen. The look is the bank's own: a deep green-blue, ice and a copper accent, with the Southern Cross as the mark.
 
 The pages exist in Spanish and English. Spanish is the default, `?lang=en` in the link opens them in English, a switch on every screen (the PIN screen and the signing link included) changes it, and the choice lasts for the visit. The contract has the same pages and clauses in both languages. Messages and emails to the customer stay in Spanish, the bank's language.
 
 A signature records what was read: the audit row of `proposal_signed` carries the language the contract was shown in and a SHA-256 fingerprint of that exact wording, and the result screen shows the start of the fingerprint.
 
 A phone app belongs to one customer, so links sent to the chat name the customer (`/app?u=<customer id>&next=<page>`), and the PIN proves it is them. Opened with no customer named, `/app` is the demo customer's app. A session lasts ten minutes in an `HttpOnly`, `SameSite=Lax` cookie, pages are sent with `Cache-Control: no-store`, and redirects never leave `/app`.
+
+The assistant screen does not contain a vendor's widget. `ASSISTANT_EMBED_HTML` holds the embed snippet of whichever conversation widget is used, and the app replaces `{variables}` in it with `{"channel": "app", "channel_identity": "<customer id>"}`. With that, the agent can send the identity confirmation to this app without asking for a document number (`identity/push` with `customer_ref`). The reference only says where the confirmation goes: the approval behind the PIN is still what verifies the customer. A production app would hand the widget a short-lived signed token minted by the bank's server instead of a plain reference.
 
 PINs are not in this repository. The seed script derives each customer's PIN from `APP_PIN_SECRET` and stores only a salted PBKDF2 hash. `python scripts/seed.py --pins` prints them for whoever holds the secret.
 

@@ -1,0 +1,81 @@
+{% extends "app/base.html" %}
+{% block title %}{{ t.assistant_title }}{% endblock %}
+{% block style %}
+    #live .card { border-color: var(--copper); background: var(--copper-soft); }
+    #live .code { background: #fff; margin: .7rem 0; font-size: 1.8rem; padding: .8rem 0 .8rem .28em; }
+    main { padding-bottom: 7rem; }
+{% endblock %}
+{% block content %}
+  <h1>{{ t.assistant_heading }}</h1>
+  <p class="muted">{{ t.assistant_text }}</p>
+  {# Requests from the assistant show up here, so the customer answers without leaving the page. #}
+  <div id="live" aria-live="polite"
+       data-confirm="{{ t.live_confirm }}" data-hint="{{ t.confirm_code_hint }}"
+       data-approve="{{ t.approve }}" data-deny="{{ t.deny }}" data-proposal="{{ t.live_proposal }}"
+       data-sign="{{ t.read_and_sign }}" data-month="{{ t.per_month }}"></div>
+  <p class="muted small">{{ t.assistant_live }}</p>
+{% endblock %}
+{% block embed %}{{ embed|safe }}{% endblock %}
+{% block script %}
+<script>
+  // Ask every three seconds what is waiting for the customer and draw it. The page is never
+  // reloaded, because that would end the conversation.
+  const live = document.getElementById("live");
+  const words = live.dataset;
+  let drawn = "";
+
+  function element(tag, text, className) {
+    const node = document.createElement(tag);
+    node.textContent = text;
+    if (className) node.className = className;
+    return node;
+  }
+
+  async function answer(id, decision) {
+    await fetch(`/app/confirmations/${id}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `decision=${decision}`,
+    });
+    refresh();
+  }
+
+  function draw(waiting) {
+    live.replaceChildren();
+    for (const item of waiting.confirmations) {
+      const card = element("div", "", "card");
+      card.append(element("strong", words.confirm), element("div", item.code, "code"));
+      card.append(element("p", words.hint, "muted small"));
+      const approve = element("button", words.approve);
+      const deny = element("button", words.deny, "secondary");
+      approve.addEventListener("click", () => answer(item.id, "approve"));
+      deny.addEventListener("click", () => answer(item.id, "deny"));
+      card.append(approve, deny);
+      live.append(card);
+    }
+    for (const item of waiting.proposals) {
+      const card = element("div", "", "card");
+      card.append(element("strong", words.proposal));
+      card.append(element("p", `${item.name} · ${item.premium} ${words.month}`, "muted small"));
+      const link = element("a", words.sign, "button");
+      link.href = `/app/proposals/${item.number}`;
+      link.target = "_blank";
+      card.append(link);
+      live.append(card);
+    }
+  }
+
+  async function refresh() {
+    const response = await fetch("/app/assistant/waiting", { cache: "no-store" });
+    if (!response.ok) return;
+    const text = await response.text();
+    if (text !== drawn) {
+      drawn = text;
+      draw(JSON.parse(text));
+    }
+  }
+
+  refresh();
+  setInterval(refresh, 3000);
+</script>
+{% endblock %}

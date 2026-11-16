@@ -5,6 +5,24 @@ TEXTS = {
     "footer": "Banco Magallanes is a fictional bank. Demonstration site, with no real "
     "customers or transactions.",
     "back_home": "Back to home",
+    "tabs_label": "Sections",
+    "tab_home": "Home",
+    "tab_assistant": "Assistant",
+    # Talking to the bank
+    "assistant_cta": "Talk to the bank",
+    "assistant_cta_hint": "By voice or chat, with the virtual assistant.",
+    "assistant_title": "Assistant",
+    "assistant_heading": "Talk to the bank",
+    "assistant_text": "Use the conversation button below. You are already signed in with your "
+    "PIN, so the assistant knows which app to send the confirmation to and will not ask for "
+    "your ID number.",
+    "assistant_live": "Whatever the assistant sends you shows up here, without leaving the "
+    "conversation.",
+    "assistant_off_title": "Assistant not available",
+    "assistant_off_text": "The conversation with the assistant is not switched on for this site.",
+    "live_confirm": "Is this you? Confirm your identity",
+    "live_proposal": "Your proposal is ready",
+    "read_and_sign": "Read and sign",
     # PIN screen
     "login_title": "Sign in",
     "hello": "Hello, {name}",
