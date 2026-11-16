@@ -13,6 +13,7 @@ from app.config import Settings, get_settings
 from app.errors import register_error_handlers
 from app.routers import (
     accounts,
+    app_assistant,
     app_auth,
     app_contract,
     app_pages,
@@ -82,6 +83,7 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
     app.include_router(app_auth.router)
     app.include_router(app_pages.router)
     app.include_router(app_contract.router)
+    app.include_router(app_assistant.router)
     # The MCP endpoint checks the same API key itself, in a header or as a bearer token.
     app.include_router(mcp_server.router)
     return app

@@ -1,16 +1,16 @@
 {% extends "app/base.html" %}
 {% block title %}{{ t.proposal }} {{ proposal.proposal_number }}{% endblock %}
-{% block width %}wide{% endblock %}
 {% block style %}
-    .sheet { border: 1px solid var(--line); border-radius: 4px; padding: 2rem 1.75rem 1rem;
-             margin: 1rem 0; font-family: Georgia, "Times New Roman", serif; font-size: .95rem;
-             box-shadow: 0 1px 3px rgba(22, 33, 46, .08); }
+    .sheet { border: 1px solid var(--line); border-radius: 6px; padding: 1.4rem 1.1rem .9rem;
+             margin: 1rem 0; font-family: Georgia, "Times New Roman", serif; font-size: .92rem;
+             background: #fff; box-shadow: 0 1px 3px rgba(11, 37, 48, .08); }
     .sheet h3 { font-size: 1.05rem; margin: 0 0 .25rem; text-transform: uppercase;
                 letter-spacing: .04em; }
     .sheet h4 { font-size: .95rem; margin: 1.25rem 0 .35rem; }
     .sheet table { width: 100%; border-collapse: collapse; margin: .75rem 0; }
     .sheet td { padding: .4rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
-    .sheet td:first-child { color: var(--muted); width: 38%; }
+    .sheet td:first-child { color: var(--muted); width: 40%; }
+    .sheet td { overflow-wrap: anywhere; }
     .sheet ol, .sheet ul { padding-left: 1.2rem; }
     .sheet li { margin: .35rem 0; }
     .sheetfoot { display: flex; justify-content: space-between; align-items: center; gap: 1rem;
@@ -28,7 +28,7 @@
     .initial input:focus-visible + .box { outline: 2px solid var(--accent); outline-offset: 2px; }
     .signing { border: 1px solid var(--line); border-radius: 12px; padding: 1.25rem; margin: 1.5rem 0; }
     .signature { width: 100%; border: 0; border-bottom: 1.5px solid var(--ink); padding: .4rem .2rem;
-                 font-size: 2rem; color: #14306b; background: transparent;
+                 font-size: 2rem; color: #0f4c5c; background: transparent;
                  font-family: "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive; }
     .signline { display: flex; justify-content: space-between; gap: 1rem; font-size: .8rem;
                 color: var(--muted); margin: .35rem 0 1rem; }

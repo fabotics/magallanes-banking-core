@@ -2,101 +2,70 @@
 <html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0b2530">
   {% block refresh %}{% endblock %}
   <title>Banco Magallanes | {% block title %}App{% endblock %}</title>
-  <style>
-    :root { --ink: #16212e; --muted: #5d6b7a; --line: #dfe5ec; --soft: #f4f6f9;
-            --accent: #0b3d6b; --ok: #17753a; --bad: #a12b23; }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: #e9edf2; color: var(--ink); line-height: 1.45;
-           font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-    .phone { max-width: 27rem; min-height: 100vh; margin: 0 auto; background: #fff;
-             display: flex; flex-direction: column; }
-    @media (min-width: 40rem) {
-      .phone { min-height: 0; margin: 2.5rem auto; border-radius: 18px; overflow: hidden;
-               box-shadow: 0 12px 40px rgba(22, 33, 46, .14); }
-      .phone.wide { max-width: 46rem; }
-    }
-    header { display: flex; align-items: center; justify-content: space-between;
-             padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); }
-    .brand { display: flex; align-items: center; gap: .6rem; font-weight: 650;
-             letter-spacing: .01em; color: var(--accent); text-decoration: none; }
-    .brand svg { width: 28px; height: 28px; }
-    header form { margin: 0; }
-    .tools { display: flex; align-items: center; gap: .9rem; }
-    .langs { display: flex; gap: .15rem; font-size: .8rem; font-weight: 600; }
-    .langs a { padding: .2rem .45rem; border-radius: 6px; color: var(--muted); text-decoration: none; }
-    .langs a[aria-current] { background: var(--soft); color: var(--accent); }
-    .link { background: none; border: 0; padding: 0; color: var(--muted); font: inherit;
-            font-size: .9rem; cursor: pointer; text-decoration: underline; }
-    main { padding: 1.5rem 1.25rem 2rem; flex: 1; }
-    h1 { font-size: 1.35rem; margin: 0 0 .35rem; font-weight: 650; }
-    h2 { font-size: .8rem; margin: 1.75rem 0 .6rem; color: var(--muted); font-weight: 600;
-         text-transform: uppercase; letter-spacing: .08em; }
-    p { margin: .5rem 0; }
-    .muted { color: var(--muted); }
-    .small { font-size: .875rem; }
-    .card { border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem;
-            margin: .6rem 0; background: #fff; }
-    a.card { display: block; color: inherit; text-decoration: none; }
-    a.card:hover { border-color: var(--accent); }
-    .card strong { display: block; }
-    .plastic { background: var(--accent); color: #fff; border: 0; padding: 1.1rem 1.2rem; }
-    .plastic .number { font-size: 1.15rem; letter-spacing: .12em; margin-top: 1.4rem; }
-    .tag { display: inline-block; font-size: .75rem; font-weight: 600; padding: .15rem .5rem;
-           border-radius: 99px; background: var(--soft); color: var(--accent); }
-    .code { font-size: 2.1rem; font-weight: 650; letter-spacing: .3em; text-align: center;
-            padding: 1rem 0; margin: 1rem 0; background: var(--soft); border-radius: 12px;
-            font-variant-numeric: tabular-nums; }
-    button, .button { display: block; width: 100%; padding: .9rem 1rem; border-radius: 10px;
-            border: 1px solid var(--accent); background: var(--accent); color: #fff;
-            font: inherit; font-weight: 600; cursor: pointer; text-align: center;
-            text-decoration: none; }
-    button.secondary, .button.secondary { background: #fff; color: var(--accent); }
-    button + button, form + form { margin-top: .6rem; }
-    .pin { width: 100%; padding: .8rem; font-size: 1.8rem; text-align: center;
-           letter-spacing: .6em; border: 1px solid var(--line); border-radius: 10px;
-           margin: 1rem 0; font-variant-numeric: tabular-nums; }
-    .pin:focus, .signature:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
-    .error { color: var(--bad); font-weight: 600; }
-    .ok { color: var(--ok); font-weight: 600; }
-    dl { display: grid; grid-template-columns: auto 1fr; gap: .4rem 1rem; margin: 1rem 0; }
-    dt { color: var(--muted); }
-    dd { margin: 0; font-weight: 600; }
-    footer { padding: 1rem 1.25rem; border-top: 1px solid var(--line); color: var(--muted);
-             font-size: .75rem; }
-    {% block style %}{% endblock %}
-  </style>
+  {% include "app/_style.html" %}
+  <style>{% block style %}{% endblock %}</style>
 </head>
 <body>
-<div class="phone {% block width %}{% endblock %}">
-  <header>
+<div class="device">
+  {# Only drawn inside the phone frame of a wide screen. #}
+  <div class="statusbar" aria-hidden="true">
+    <span id="clock">9:41</span>
+    <svg viewBox="0 0 46 12"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/><rect x="25" y="1" width="19" height="10" rx="3" fill="none" stroke="#fff"/><rect x="27" y="3" width="13" height="6" rx="1.5"/></svg>
+  </div>
+  <header class="appbar">
     <a class="brand" href="/app">
+      {# The mark: the Southern Cross over the water. #}
       <svg viewBox="0 0 32 32" aria-hidden="true">
-        <circle cx="16" cy="16" r="15" fill="#0b3d6b"/>
-        <path d="M8 22V10l8 8 8-8v12" fill="none" stroke="#fff" stroke-width="2.6"
-              stroke-linecap="round" stroke-linejoin="round"/>
+        <rect width="32" height="32" rx="9" fill="#0f4c5c"/>
+        <path d="M5 23c3.5-2.4 7-2.4 11 0s7.5 2.4 11 0" fill="none" stroke="#9fc3c6" stroke-width="1.8" stroke-linecap="round"/>
+        <g fill="#f0a36b"><circle cx="16" cy="6.5" r="1.7"/><circle cx="10.5" cy="12" r="1.4"/><circle cx="21.5" cy="11" r="1.4"/><circle cx="16.5" cy="17" r="1.9"/><circle cx="19.5" cy="13.5" r=".9"/></g>
       </svg>
-      Banco Magallanes
+      <span><small>Banco</small>Magallanes</span>
     </a>
-    <div class="tools">
-      <nav class="langs" aria-label="Idioma / Language">
-        {% for code, href in languages %}
-        <a href="{{ href }}" lang="{{ code }}"{% if code == lang %} aria-current="true"{% endif %}>{{ code|upper }}</a>
-        {% endfor %}
-      </nav>
-      {% if signed_in %}
-      <form method="post" action="/app/logout"><button class="link" type="submit">{{ t.sign_out }}</button></form>
-      {% endif %}
-    </div>
+    <nav class="langs" aria-label="Idioma / Language">
+      {% for code, href in languages %}
+      <a href="{{ href }}" lang="{{ code }}"{% if code == lang %} aria-current="true"{% endif %}>{{ code|upper }}</a>
+      {% endfor %}
+    </nav>
   </header>
-  <main>
-    {% block content %}{% endblock %}
-  </main>
-  <footer>{{ t.footer }}</footer>
+  <div class="scroll">
+    <main>
+      {% block content %}{% endblock %}
+    </main>
+    <p class="fineprint">{{ t.footer }}</p>
+  </div>
+  {% if signed_in %}
+  <nav class="tabs" aria-label="{{ t.tabs_label }}">
+    <a href="/app/home"{% if tab == "home" %} aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11.5 12 5l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5h-5v5H5a1 1 0 0 1-1-1z"/></svg>
+      {{ t.tab_home }}
+    </a>
+    {% if assistant %}
+    <a href="/app/assistant"{% if tab == "assistant" %} aria-current="page"{% endif %}>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-6l-4.5 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8.5 10.5h7"/></svg>
+      {{ t.tab_assistant }}
+    </a>
+    {% endif %}
+    <form method="post" action="/app/logout">
+      <button type="submit">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h4a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h9"/></svg>
+        {{ t.sign_out }}
+      </button>
+    </form>
+  </nav>
+  {% endif %}
+  {% block embed %}{% endblock %}
 </div>
+<script>
+  // The clock of the phone frame shows the real time.
+  document.getElementById("clock").textContent =
+    new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: false });
+</script>
 {% block script %}{% endblock %}
 </body>
 </html>
