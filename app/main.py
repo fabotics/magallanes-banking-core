@@ -3,9 +3,12 @@
 Run locally with `uvicorn app.main:app --reload`.
 """
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, FastAPI
 
-from app import __version__
+from app import __version__, db
+from app.config import Settings, get_settings
 from app.errors import ApiError, api_error_handler
 from app.security import require_api_key
 
@@ -21,9 +24,13 @@ def create_app() -> FastAPI:
     app.add_exception_handler(ApiError, api_error_handler)
 
     @app.get("/health", tags=["health"])
-    def health() -> dict[str, str]:
-        """Liveness check. The database status becomes real once the repository exists."""
-        return {"status": "ok", "database": "not_configured", "version": __version__}
+    def health(settings: Annotated[Settings, Depends(get_settings)]) -> dict[str, str]:
+        """Liveness check, with the state of the database connection."""
+        return {
+            "status": "ok",
+            "database": db.database_status(settings),
+            "version": __version__,
+        }
 
     # Every business route is added to this router, so the API key check
     # applies to all of `/v1` without repeating it on each endpoint.
