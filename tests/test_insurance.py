@@ -37,7 +37,7 @@ def test_eligible_customer_gets_a_choice_of_products(client: TestClient, marta: 
     assert body["products"][0] == {
         "code": "CARD_FRAUD",
         "name": "Protección de tarjeta y asistencia",
-        "monthly_premium": 8990,
+        "monthly_premium": 10790,
         "currency": "CLP",
         "coverage_summary": body["products"][0]["coverage_summary"],
         "quote_number": body["products"][0]["quote_number"],

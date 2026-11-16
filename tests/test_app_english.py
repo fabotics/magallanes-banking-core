@@ -127,7 +127,7 @@ def test_the_contract_is_fully_in_english(client: TestClient, marta: dict) -> No
     page = client.get(f"/app/proposals/{number}").text
     for expected in (
         "Review and sign your proposal", "Insurance proposal", "Card protection and assistance",
-        "CLP 8,990", "Visa credit card ending in 4821", "Policyholder and intermediary",
+        "CLP 10,790", "Visa credit card ending in 4821", "Policyholder and intermediary",
         "Cash stolen after a withdrawal", "Quote No.", "CLP 1,500,000", "Exclusions",
         "Right of withdrawal", "Early termination",
         "Electronic signature", f"Proposal {number} · Page 4 of 4", 'data-label="Initials"',
@@ -156,7 +156,7 @@ def test_a_signature_records_the_language_and_the_fingerprint_of_what_was_shown(
     # The confirmation is written in the language she read and signed in.
     text = telegram[-1]["json"]["text"]
     assert "Your Card protection and assistance insurance is now active" in text
-    assert "In force from" in text and "Monthly premium: CLP 8,990" in text
+    assert "In force from" in text and "Monthly premium: CLP 10,790" in text
 
 
 def test_the_fingerprint_is_of_the_wording_in_that_language(
@@ -189,7 +189,7 @@ def test_the_signing_link_in_english(
     assert "Firmar propuesta" in spanish and f"{link}?lang=en" in spanish
     english = client.get(f"{link}?lang=en").text
     assert "Sign proposal" in english and "Card protection and assistance" in english
-    assert "CLP 8,990" in english and "Monthly premium" in english
+    assert "CLP 10,790" in english and "Monthly premium" in english
     signed = client.post(link)
     assert "Proposal signed. Your insurance is now active." in signed.text
     assert signed_detail(repository)["language"] == "en"

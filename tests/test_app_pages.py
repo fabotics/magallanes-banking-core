@@ -105,7 +105,7 @@ def test_the_contract_is_complete_and_personal(
     assert f"/app/proposals/{number}" in signed_in.get("/app/home").text
     page = signed_in.get(f"/app/proposals/{number}").text
     for expected in (
-        "Marta Rojas Fuentes", "31.415.926-8", "Protección de tarjeta y asistencia", "$8.990",
+        "Marta Rojas Fuentes", "31.415.926-8", "Protección de tarjeta y asistencia", "$10.790",
         "Magallanes Seguros Generales S.A.", "tarjeta Visa de crédito terminada en 4821",
         "Coberturas", "Exclusiones", "Derecho de retracto", "Término anticipado",
         f"Propuesta {number} · Página 4 de 4", 'data-initials="MR"', "Firmar y contratar",

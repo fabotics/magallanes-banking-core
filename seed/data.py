@@ -48,7 +48,7 @@ PRODUCTS = [
     {
         "code": FRAUD_PRODUCT,
         "name": "Protección de tarjeta y asistencia",
-        "monthly_premium": 9990,
+        "monthly_premium": 11990,
         "currency": "CLP",
         "coverage_summary": "Cubre lo que la ley no pone a cargo del banco: el robo de efectivo "
         "después de un giro, dinero de emergencia mientras llega la tarjeta de reemplazo, la "
