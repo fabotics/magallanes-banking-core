@@ -147,6 +147,17 @@ def sign_in(
     return response
 
 
+@router.get("/app/login", include_in_schema=False)
+@router.get("/app/logout", include_in_schema=False)
+def back_to_the_sign_in_screen() -> Response:
+    """Send a browser that asks for these addresses directly to the sign-in screen.
+
+    Both addresses only take a posted form. A reload or the back button after a
+    wrong PIN asks for them with GET, and that must not end on an error.
+    """
+    return RedirectResponse("/app", status_code=303)
+
+
 @router.post("/app/logout")
 def sign_out(
     request: Request, repository: Annotated[Repository, Depends(get_repository)]
