@@ -16,6 +16,7 @@ from fastapi import Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app import i18n
 from app.clock import parse_time, utc_now
 from app.config import Settings
 from app.db import Repository, Row
@@ -30,9 +31,28 @@ HOME = "/app/home"
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
 
-def page(request: Request, name: str, context: dict[str, Any], status: int = 200) -> HTMLResponse:
-    """Render an app page. Pages hold customer data, so they are never cached or framed."""
+def page(
+    request: Request,
+    name: str,
+    context: dict[str, Any],
+    status: int = 200,
+    switch_to: tuple[str, dict[str, str]] | None = None,
+) -> HTMLResponse:
+    """Render an app page in the visitor's language.
+
+    Pages hold customer data, so they are never cached or framed. `switch_to`
+    is the address and parameters the language links point to, for a page that
+    answers a form.
+    """
+    language = context.get("lang") or i18n.pick_language(request)
+    context = {
+        "lang": language,
+        "t": i18n.TEXTS[language],
+        "languages": i18n.switch_links(request, *(switch_to or ())),
+        **context,
+    }
     response = templates.TemplateResponse(request, f"app/{name}.html", context, status)
+    i18n.remember(request, response)
     response.headers["Cache-Control"] = "no-store"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -40,11 +60,17 @@ def page(request: Request, name: str, context: dict[str, Any], status: int = 200
 
 
 def message(
-    request: Request, title: str, text: str, tone: str = "muted", **extra: Any
+    request: Request, title: str, text: str, tone: str = "muted", status: int = 200, **extra: Any
 ) -> HTMLResponse:
-    """Render the one-message page a signed-in customer sees for results and dead ends."""
-    context = {"title": title, "text": text, "tone": tone, "signed_in": True, **extra}
-    return page(request, "message", context)
+    """Render the one-message page for results and dead ends.
+
+    `title` and `text` are keys of the text tables, so the page comes out in
+    the visitor's language.
+    """
+    words = i18n.TEXTS[i18n.pick_language(request)]
+    context = {"title": words[title], "text": words[text], "tone": tone, **extra}
+    context.setdefault("signed_in", True)
+    return page(request, "message", context, status)
 
 
 async def form_fields(request: Request) -> dict[str, str]:
@@ -62,7 +88,9 @@ def safe_next(target: str | None) -> str:
 
 def to_login(request: Request) -> RedirectResponse:
     """Send a visitor without a session to the PIN screen, and back here afterwards."""
-    return RedirectResponse(f"/app?next={quote(request.url.path)}", status_code=303)
+    response = RedirectResponse(f"/app?next={quote(request.url.path)}", status_code=303)
+    i18n.remember(request, response)
+    return response
 
 
 def app_link(settings: Settings, customer: Row, path: str) -> str:

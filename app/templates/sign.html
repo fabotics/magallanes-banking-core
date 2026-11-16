@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Banco Magallanes | Firma de propuesta</title>
+  <title>Banco Magallanes | {{ t.link_title }}</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #f3f5f8; color: #1c2733; margin: 0; }
     main { max-width: 30rem; margin: 3rem auto; background: #fff; padding: 2rem; border-radius: 12px; }
@@ -15,40 +15,51 @@
              color: #fff; font-size: 1rem; cursor: pointer; }
     .ok { color: #17753a; font-weight: 600; }
     small { color: #5b6876; }
+    .top { display: flex; justify-content: space-between; align-items: center; }
+    .langs a { padding: .2rem .45rem; border-radius: 6px; color: #5b6876; text-decoration: none;
+               font-size: .8rem; font-weight: 600; }
+    .langs a[aria-current] { background: #f3f5f8; color: #0b3d6b; }
   </style>
 </head>
 <body>
 <main>
-  <p><strong>Banco Magallanes</strong></p>
+  <div class="top">
+    <strong>Banco Magallanes</strong>
+    <nav class="langs" aria-label="Idioma / Language">
+      {% for code, href in languages %}
+      <a href="{{ href }}" lang="{{ code }}"{% if code == lang %} aria-current="true"{% endif %}>{{ code|upper }}</a>
+      {% endfor %}
+    </nav>
+  </div>
   {% if proposal is none %}
-    <h1>Enlace no válido</h1>
-    <p>No encontramos una propuesta para este enlace. Revisa el correo que te enviamos.</p>
+    <h1>{{ t.link_invalid_title }}</h1>
+    <p>{{ t.link_invalid_text }}</p>
   {% else %}
-    <h1>Propuesta {{ proposal.proposal_number }}</h1>
-    <p>Hola {{ customer.first_name }}, esta es la propuesta que conversamos.</p>
+    <h1>{{ t.proposal }} {{ proposal.proposal_number }}</h1>
+    <p>{{ t.link_hello.format(name=customer.first_name) }}</p>
     <dl>
-      <dt>Producto</dt><dd>{{ product.name }}</dd>
-      <dt>Prima mensual</dt><dd>{{ premium }}</dd>
-      <dt>Cobertura</dt><dd>{{ product.coverage_summary }}</dd>
+      <dt>{{ t.product }}</dt><dd>{{ product_name }}</dd>
+      <dt>{{ t.premium }}</dt><dd>{{ premium }}</dd>
+      <dt>{{ t.cover }}</dt><dd>{{ cover }}</dd>
     </dl>
     {% if status == "signed" %}
-      <p class="ok">Propuesta firmada. Tu seguro ya está activo.</p>
+      <p class="ok">{{ t.link_signed }}</p>
       {% if policy %}
       <dl>
-        <dt>Póliza</dt><dd>{{ policy.policy_number }}</dd>
-        <dt>Vigente desde</dt><dd>{{ start }}</dd>
+        <dt>{{ t.policy }}</dt><dd>{{ policy.policy_number }}</dd>
+        <dt>{{ t.since }}</dt><dd>{{ start }}</dd>
       </dl>
       {% endif %}
     {% elif status == "pending" and proposal.signing_token %}
       <form method="post">
-        <button type="submit">Firmar propuesta</button>
+        <button type="submit">{{ t.link_sign }}</button>
       </form>
-      <p><small>Al firmar aceptas contratar este seguro con cargo a tu tarjeta.</small></p>
+      <p><small>{{ t.link_consent }}</small></p>
     {% else %}
-      <p>Esta propuesta ya no está vigente.</p>
+      <p>{{ t.link_expired }}</p>
     {% endif %}
   {% endif %}
-  <p><small>Demo. Banco Magallanes es un banco ficticio.</small></p>
+  <p><small>{{ t.footer }}</small></p>
 </main>
 </body>
 </html>

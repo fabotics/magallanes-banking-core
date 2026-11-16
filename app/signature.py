@@ -48,9 +48,18 @@ def mark_viewed(repository: Repository, proposal: Row, now: datetime, endpoint: 
 
 
 def sign(
-    repository: Repository, settings: Settings, proposal: Row, now: datetime, endpoint: str
+    repository: Repository,
+    settings: Settings,
+    proposal: Row,
+    now: datetime,
+    endpoint: str,
+    **evidence: str,
 ) -> Row | None:
-    """Sign a pending proposal and return the new policy. Anything else returns None."""
+    """Sign a pending proposal and return the new policy. Anything else returns None.
+
+    `evidence` goes into the audit row: the language the customer read, and
+    the fingerprint of the document when a full contract was shown.
+    """
     if proposal_status(proposal, now) != "pending" or proposal["signing_token"] is None:
         return None
     values = {"status": "signed", "signed_at": now.isoformat()}
@@ -69,9 +78,19 @@ def sign(
     audit.record(
         repository, endpoint, "POST", proposal["customer_id"], "proposal_signed",
         proposal_number=proposal["proposal_number"], policy_number=policy["policy_number"],
+        **evidence,
     )  # fmt: skip
     confirm_in_writing(repository, settings, policy)
     return policy
+
+
+def signing_record(repository: Repository, proposal: Row) -> Row:
+    """Return what the audit trail recorded when this proposal was signed, or nothing."""
+    filters = {"customer_id": proposal["customer_id"], "outcome": "proposal_signed"}
+    for row in repository.select("audit_log", filters):
+        if row["detail"].get("proposal_number") == proposal["proposal_number"]:
+            return row["detail"]
+    return {}
 
 
 def confirm_in_writing(repository: Repository, settings: Settings, policy: Row) -> None:

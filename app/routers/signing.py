@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app import signature
+from app import contracts, i18n, signature
 from app.clock import bank_date, parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
@@ -26,20 +26,33 @@ ENDPOINT = "/sign/{signing_token}"
 
 def render(request: Request, repository: Repository, proposal: Row | None) -> HTMLResponse:
     """Render the page for a proposal, or a not-found page when the link is wrong."""
-    if proposal is None:
-        return templates.TemplateResponse(request, "sign.html", {"proposal": None}, 404)
-    product = repository.select("insurance_products", {"code": proposal["product_code"]})[0]
-    policy = signature.policy_for(repository, proposal)
+    language = i18n.pick_language(request)
     context = {
         "proposal": proposal,
-        "status": signature.proposal_status(proposal, utc_now()),
-        "product": product,
-        "premium": money(product["monthly_premium"], product["currency"]),
-        "customer": repository.select("customers", {"id": proposal["customer_id"]})[0],
-        "policy": policy,
-        "start": long_date(bank_date(parse_time(policy["started_at"]))) if policy else None,
+        "lang": language,
+        "t": i18n.TEXTS[language],
+        "languages": i18n.switch_links(request),
     }
-    return templates.TemplateResponse(request, "sign.html", context)
+    if proposal is None:
+        response = templates.TemplateResponse(request, "sign.html", context, 404)
+        i18n.remember(request, response)
+        return response
+    product = repository.select("insurance_products", {"code": proposal["product_code"]})[0]
+    policy = signature.policy_for(repository, proposal)
+    name, cover = contracts.product_wording(product, language)
+    start = long_date(bank_date(parse_time(policy["started_at"])), language) if policy else None
+    context.update(
+        status=signature.proposal_status(proposal, utc_now()),
+        product_name=name,
+        cover=cover,
+        premium=money(product["monthly_premium"], product["currency"], language),
+        customer=repository.select("customers", {"id": proposal["customer_id"]})[0],
+        policy=policy,
+        start=start,
+    )
+    response = templates.TemplateResponse(request, "sign.html", context)
+    i18n.remember(request, response)
+    return response
 
 
 def find_proposal(repository: Repository, signing_token: str) -> Row | None:
@@ -68,9 +81,13 @@ def sign_proposal(
     repository: Annotated[Repository, Depends(get_repository)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> HTMLResponse:
-    """Sign the proposal and create the policy. Signing twice changes nothing."""
+    """Sign the proposal and create the policy. Signing twice changes nothing.
+
+    The audit row records the language the page was shown in.
+    """
     proposal = find_proposal(repository, signing_token)
     if proposal is not None:
-        signature.sign(repository, settings, proposal, utc_now(), ENDPOINT)
+        language = i18n.pick_language(request)
+        signature.sign(repository, settings, proposal, utc_now(), ENDPOINT, language=language)
         proposal = find_proposal(repository, signing_token)
     return render(request, repository, proposal)
