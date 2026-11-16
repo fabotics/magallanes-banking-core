@@ -10,8 +10,8 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 
-from app import audit
-from app.clock import parse_time, utc_now
+from app import audit, statement
+from app.clock import BANK_TIMEZONE, parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.errors import ApiError
@@ -27,7 +27,10 @@ router = APIRouter(tags=["cards"])
 
 
 def to_transaction(row: Row, card_last4: str) -> CardTransaction:
-    """Shape a stored transaction for the response. Foreign charges keep their original amount."""
+    """Shape a stored transaction for the response. Foreign charges keep their original amount.
+
+    Days and hours are given on the bank's clock, also in words.
+    """
     fields = {
         "id": row["id"],
         "card_last4": card_last4,
@@ -37,8 +40,7 @@ def to_transaction(row: Row, card_last4: str) -> CardTransaction:
         "merchant_tax_id": row["merchant_tax_id"],
         "channel": row["channel"],
         "country": row["country"],
-        "transaction_at": row["transaction_at"],
-        "posted_at": row["posted_at"],
+        **statement.local_fields(row),
         "status": row["status"],
     }
     if row["original_currency"]:
@@ -76,7 +78,12 @@ def get_transactions(
                 transactions.append(to_transaction(row, card["last4"]))
     transactions.sort(key=lambda item: parse_time(item.transaction_at), reverse=True)
     audit.note(request, count=len(transactions))
-    return TransactionsResponse(count=len(transactions), transactions=transactions)
+    return TransactionsResponse(
+        count=len(transactions),
+        timezone=str(BANK_TIMEZONE),
+        repeated_charges=statement.repeated_charges([item.model_dump() for item in transactions]),
+        transactions=transactions,
+    )
 
 
 def block_reference(card: Row) -> str:

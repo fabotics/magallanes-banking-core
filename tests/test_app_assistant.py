@@ -114,3 +114,16 @@ def test_what_the_assistant_sends_can_be_answered_without_leaving_the_page(
     assert client.get("/app/assistant/waiting").json()["confirmations"] == []
     status = client.get(f"/v1/identity/push/{request_id}", headers=API_KEY).json()
     assert status["status"] == "approved" and status["first_name"] == "Marta"
+
+
+def test_the_conversation_sits_outside_the_part_of_the_page_that_is_replaced(
+    client: TestClient, with_widget: None
+) -> None:
+    view = sign_in(client).get("/app/assistant").text
+    keep, main = view.index('<div id="keep">'), view.index("<main>")
+    # The frame and the cards come before the content, in the block that is never swapped.
+    assert keep < view.index('id="widget"') < view.index('id="live"') < main
+    assert '<style id="page-style">' in view and "history.pushState" in view
+    # Other pages carry no such block and no navigation script: they load normally.
+    home = client.get("/app/home").text
+    assert 'id="keep"' not in home and "history.pushState" not in home

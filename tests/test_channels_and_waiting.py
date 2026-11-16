@@ -40,18 +40,47 @@ def test_the_three_ways_of_naming_reach_the_same_customer(
 
 
 @pytest.mark.parametrize(
-    "named", [{"customer_ref": "not-a-reference"}, {"phone": "+56900000000"}, {"phone": "none"}]
+    "named",
+    [
+        {"customer_ref": "not-a-reference"},
+        {"phone": "+56900000000"},
+        {"phone": "none"},
+        {"conversation_id": "c"},
+        # A phone call: the platform puts the caller's number in both places.
+        {"customer_ref": "+56900000000", "phone": "+56900000000"},
+    ],
 )
-def test_an_unknown_reference_or_phone_gets_the_same_answer(
+def test_a_channel_that_names_nobody_is_told_so_at_once(
     client: TestClient, repository: InMemoryRepository, named: dict
 ) -> None:
-    result = push(client, **named)
+    assert push(client, **named) == {"status": "not_identified"}
+    assert repository.select(confirmations.TABLE) == []
+
+
+def test_an_unknown_id_number_still_gets_the_same_answer_as_a_known_one(
+    client: TestClient, repository: InMemoryRepository
+) -> None:
+    result = push(client, customer_id="1-9")
     assert result["status"] == "pending" and result["expires_in_seconds"] == 90
     assert stored(repository, result["request_id"])["customer_id"] is None
 
 
-def test_a_request_that_names_nobody_is_refused(client: TestClient) -> None:
-    assert client.post(URL, json={"conversation_id": "c"}, headers=API_KEY).status_code == 422
+@pytest.mark.parametrize(
+    "named",
+    [
+        # Inside the app: the reference names the customer, and there is no phone.
+        {"customer_ref": MARTA_ID},
+        # A phone call: the reference is the caller's number, so the phone decides.
+        {"customer_ref": "+56955501426", "phone": "+56955501426"},
+        # The ID number the customer said wins over what the channel carries.
+        {"customer_id": "31.415.926-8", "customer_ref": seed_id("customer/emma")},
+    ],
+)
+def test_a_caller_may_send_all_it_has_and_the_bank_picks(
+    client: TestClient, repository: InMemoryRepository, named: dict
+) -> None:
+    row = stored(repository, push(client, **named)["request_id"])
+    assert row["customer_id"] == MARTA_ID
 
 
 def test_a_denial_by_phone_counts_towards_the_same_lockout(

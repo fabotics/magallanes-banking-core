@@ -1,10 +1,12 @@
 """Proposals: what the customer receives after an offer, and whether they signed it.
 
 A proposal exists only for an offer the customer accepted or asked details
-about. It goes out at once: by email with the signing link, and to the
-customer's chat with a link to the contract in the bank's app, so the customer
-can sign while still on the call. Nothing is contracted until
-they sign, and the agent can only read the result, never sign for them.
+about. Either way it is a contract to read and sign: asking for the details
+commits to nothing, and signing is what accepts. It goes out at once: by email
+with the signing link, and to the customer's chat with a link to the contract
+in the bank's app, so the customer can sign while still on the call. Asking
+again sends the same proposal again. Nothing is contracted until they sign,
+and the agent can only read the result, never sign for them.
 """
 
 import secrets
@@ -27,7 +29,7 @@ router = APIRouter(tags=["insurance"])
 
 
 def signing_link(settings: Settings, proposal: Row, language: str | None = None) -> str | None:
-    """Return the address of the signing page, or None for a proposal that is only details."""
+    """Return the address of the signing page, or None for a proposal without one."""
     if not proposal["signing_token"]:
         return None
     link = f"{settings.public_base_url.rstrip('/')}/sign/{proposal['signing_token']}"
@@ -62,7 +64,10 @@ def create_proposal(
     settings: Annotated[Settings, Depends(get_settings)],
     x_session_token: Annotated[str | None, Header()] = None,
 ) -> ProposalResponse:
-    """Create the proposal for an offer and send it. Asking twice returns the same proposal."""
+    """Create the proposal for an offer and send it.
+
+    Asking twice returns the same proposal and sends it to the customer again.
+    """
     session = require_session(request, repository, x_session_token or body.session_token)
     filters = {"id": body.offer_id, "customer_id": session["customer_id"]}
     offers = repository.select("insurance_offers", filters)
@@ -74,11 +79,9 @@ def create_proposal(
 
     customer = repository.select("customers", {"id": session["customer_id"]})[0]
     existing = repository.select("proposals", {"offer_id": offer["id"]})
-    email_sent = message_sent = False
     if existing:
         proposal = existing[0]
     else:
-        accepted = offer["customer_response"] == "accepted"
         proposal = repository.insert(
             "proposals",
             {
@@ -87,7 +90,7 @@ def create_proposal(
                 "product_code": offer["product_code"],
                 "quote_number": offer.get("quote_number"),
                 "proposal_number": f"PR-{utc_now().year}-{secrets.token_hex(3).upper()}",
-                "signing_token": secrets.token_urlsafe(24) if accepted else None,
+                "signing_token": secrets.token_urlsafe(24),
                 "status": "sent",
                 "sent_to": mask_email(customer["email"]),
                 "created_at": utc_now().isoformat(),
@@ -95,17 +98,16 @@ def create_proposal(
             },
         )
     link = signing_link(settings, proposal)
-    if not existing:
-        language = notices.language_for(customer, body.language)
-        product = quotes.for_proposal(repository, proposal)
-        subject = f"Banco Magallanes: {notices.priced(product, language)[0]}"
-        html = notices.proposal_email(product, signing_link(settings, proposal, language), language)
-        email_sent = send_email(settings, customer["email"], subject, html)
-        message_sent = send_to_messaging(settings, customer, product, proposal, language)
+    language = notices.language_for(customer, body.language)
+    product = quotes.for_proposal(repository, proposal)
+    subject = f"Banco Magallanes: {notices.priced(product, language)[0]}"
+    html = notices.proposal_email(product, signing_link(settings, proposal, language), language)
+    email_sent = send_email(settings, customer["email"], subject, html)
+    message_sent = send_to_messaging(settings, customer, product, proposal, language)
 
     audit.note(
         request,
-        outcome="proposal_sent",
+        outcome="proposal_sent_again" if existing else "proposal_sent",
         proposal_number=proposal["proposal_number"],
         email_sent=email_sent,
         message_sent=message_sent,
@@ -114,6 +116,7 @@ def create_proposal(
         proposal_number=proposal["proposal_number"],
         quote_number=proposal.get("quote_number"),
         signing_url=link,
+        valid_until=signature.last_day(proposal),
         sent_to=proposal["sent_to"],
         email_sent=email_sent,
         message_sent=message_sent,

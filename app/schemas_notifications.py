@@ -19,6 +19,31 @@ class CallSummaryRequest(BaseModel):
     )
 
 
+class ConversationEnded(BaseModel):
+    """The notice that a conversation is over, as the caller's platform sends it.
+
+    Platforms shape this notice differently. The ID is read from the top
+    level, or from an object called `data`, which is where some put it.
+    """
+
+    conversation_id: str | None = None
+    data: dict | None = None
+
+    def named_conversation(self) -> str | None:
+        """Return the conversation ID wherever the notice carries it."""
+        return self.conversation_id or (self.data or {}).get("conversation_id")
+
+
+class ClosingSummaryResponse(BaseModel):
+    """Whether the bank wrote to the customer, and if not, why."""
+
+    sent: bool
+    reason: str | None = Field(
+        default=None,
+        description="not_verified, already_sent, nothing_recorded or no_channel when not sent.",
+    )
+
+
 class CallSummaryResponse(BaseModel):
     """Whether the summary went out, and through which channel."""
 
