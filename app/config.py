@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     email_from: str = "Banco Magallanes <onboarding@resend.dev>"
     telegram_bot_token: str = ""
     demo_telegram_chat_id: str = ""
+    # The phone the first demo customer calls from, in international format. Used by the seed
+    # script, so a call from that phone is matched to that customer.
+    demo_customer_phone: str = ""
+    # The bank's phone line as the app shows it on the sign-in screen. Empty: no line is shown.
+    bank_phone_line: str = ""
     app_pin_secret: str = ""
     # True once the contact center has a phone line a call can be transferred to.
     human_line_attached: bool = False

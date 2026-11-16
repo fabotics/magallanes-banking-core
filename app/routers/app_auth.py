@@ -33,6 +33,11 @@ def not_enrolled(request: Request) -> Response:
     )
 
 
+def dialable(phone_line: str) -> str:
+    """Return a phone number as a `tel:` link wants it: the plus sign and the digits only."""
+    return "".join(c for c in phone_line if c.isdigit() or c == "+")
+
+
 def login_page(
     request: Request,
     customer: Row | None,
@@ -40,11 +45,16 @@ def login_page(
     error: str | None = None,
     status: int = 200,
     document: str = "",
+    phone_line: str = "",
 ) -> Response:
-    """Render the sign-in screen: PIN only for a known customer, else ID number and PIN."""
+    """Render the sign-in screen: PIN only for a known customer, else ID number and PIN.
+
+    `phone_line` is the bank's phone number, shown as another way to reach the bank.
+    """
     other = f"/app?{urlencode({'other': '1', 'next': target})}"
     context = {
         "customer": customer, "next": target, "error": error, "document": document, "other": other,
+        "phone_line": phone_line.strip(), "phone_dial": dialable(phone_line),
     }  # fmt: skip
     # After a failed attempt the language links go back to the same kind of screen.
     back = {"u": customer["id"], "next": target} if customer else {"other": "1", "next": target}
@@ -55,6 +65,7 @@ def login_page(
 def sign_in_screen(
     request: Request,
     repository: Annotated[Repository, Depends(get_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
     u: str | None = None,
     next: str | None = None,
     other: str | None = None,
@@ -65,6 +76,7 @@ def sign_in_screen(
     memory of the last sign-in decides. `other` asks for the full form.
     """
     target = app_session.safe_next(next)
+    line = settings.bank_phone_line
     signed_in = app_session.current_customer(request, repository)
     if signed_in is not None and (u is None or u == signed_in["id"]):
         response = RedirectResponse(target, status_code=303)
@@ -72,9 +84,11 @@ def sign_in_screen(
         return response
     if u is not None:
         customer = app_session.customer_by_id(repository, u)
-        return login_page(request, customer, target) if customer else not_enrolled(request)
+        if customer is None:
+            return not_enrolled(request)
+        return login_page(request, customer, target, phone_line=line)
     customer = None if other else app_session.remembered_customer(request, repository)
-    return login_page(request, customer, target)
+    return login_page(request, customer, target, phone_line=line)
 
 
 def who_signs_in(repository: Repository, fields: dict[str, str]) -> Row | None:
@@ -98,19 +112,20 @@ def sign_in(
     full_form = "u" not in fields
     typed = fields.get("document", "")[:20]
     customer = who_signs_in(repository, fields)
+    line = settings.bank_phone_line
     if customer is None:
         if not full_form:
             return not_enrolled(request)
         # An unknown ID number gets the same answer as a wrong PIN.
         audit.record(repository, "/app/login", "POST", None, "app_login_unknown")
-        return login_page(request, None, target, *FORM_ERRORS["wrong"], document=typed)
+        return login_page(request, None, target, *FORM_ERRORS["wrong"], typed, line)
     now = utc_now()
     result = app_session.try_pin(repository, customer, fields.get("pin", ""), now)
     audit.record(repository, "/app/login", "POST", customer["id"], f"app_pin_{result}")
     if result != "ok":
         if full_form:
-            return login_page(request, None, target, *FORM_ERRORS[result], document=typed)
-        return login_page(request, customer, target, *ERRORS[result])
+            return login_page(request, None, target, *FORM_ERRORS[result], typed, line)
+        return login_page(request, customer, target, *ERRORS[result], phone_line=line)
     secure = settings.public_base_url.startswith("https://")
     response = RedirectResponse(target, status_code=303)
     response.set_cookie(
