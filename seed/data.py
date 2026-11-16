@@ -19,6 +19,7 @@ TABLES = [
     "accounts",
     "cards",
     "transactions",
+    "quotes",
     "insurance_offers",
     "proposals",
     "policies",
@@ -38,15 +39,19 @@ FRAUD_PRODUCT = "CARD_FRAUD"
 
 # Names and coverage are in the customers' language: the agent, the proposal and the
 # policy all use these exact words, so nothing the customer hears is a translation.
+# `monthly_premium` is the base price: each customer gets a quote computed from it.
+# The card product covers only what the law does not already place on the card issuer:
+# an issuer may not sell cover for unauthorized charges it has to bear anyway.
 
 PRODUCTS = [
     {
         "code": FRAUD_PRODUCT,
-        "name": "Protección contra fraude de tarjeta",
+        "name": "Protección de tarjeta y asistencia",
         "monthly_premium": 2990,
         "currency": "CLP",
-        "coverage_summary": "Devuelve los cargos no autorizados hechos con la tarjeta y cubre "
-        "la reposición de la tarjeta.",
+        "coverage_summary": "Cubre lo que la ley no pone a cargo del banco: el robo de efectivo "
+        "después de un giro, dinero de emergencia mientras llega la tarjeta de reemplazo, la "
+        "reposición de documentos robados y asistencia para los trámites.",
         "eligible_segments": ["mass", "preferred", "premium"],
         "active": True,
     },
@@ -78,7 +83,7 @@ def build_seed(
 ) -> dict[str, list[dict]]:
     """Build all seed rows relative to `today` (defaults to the current date at the bank).
 
-    Tables that start empty (offers, proposals, cases, sessions, confirmations,
+    Tables that start empty (quotes, offers, proposals, cases, sessions, confirmations,
     audit) are present with no rows, so a reset clears every pending item too.
     """
     today = today or datetime.now(BANK_TIMEZONE).date()

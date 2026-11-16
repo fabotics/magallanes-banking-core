@@ -9,7 +9,7 @@ gets the details in writing, and each step leaves an audit row.
 import secrets
 from datetime import datetime, timedelta
 
-from app import audit
+from app import audit, quotes
 from app.clock import bank_date, parse_time
 from app.config import Settings
 from app.db import Repository, Row
@@ -80,7 +80,7 @@ def sign(
         proposal_number=proposal["proposal_number"], policy_number=policy["policy_number"],
         **evidence,
     )  # fmt: skip
-    confirm_in_writing(repository, settings, policy)
+    confirm_in_writing(repository, settings, policy, proposal)
     return policy
 
 
@@ -93,10 +93,12 @@ def signing_record(repository: Repository, proposal: Row) -> Row:
     return {}
 
 
-def confirm_in_writing(repository: Repository, settings: Settings, policy: Row) -> None:
+def confirm_in_writing(
+    repository: Repository, settings: Settings, policy: Row, proposal: Row
+) -> None:
     """Send the policy details by email and to the customer's messaging channel."""
     customer = repository.select("customers", {"id": policy["customer_id"]})[0]
-    product = repository.select("insurance_products", {"code": policy["product_code"]})[0]
+    product = quotes.for_proposal(repository, proposal)
     start = long_date(bank_date(parse_time(policy["started_at"])))
     subject = f"Banco Magallanes: su póliza {policy['policy_number']}"
     send_email(settings, customer["email"], subject, policy_email(product, policy, start))

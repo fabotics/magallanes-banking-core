@@ -11,6 +11,7 @@ call must not be able to read it aloud.
 """
 
 import secrets
+import uuid
 from datetime import datetime, timedelta
 
 from app.app_session import app_link
@@ -21,6 +22,33 @@ from app.messaging import send_telegram
 
 CONFIRMATION_LIFETIME = timedelta(seconds=90)
 TABLE = "identity_confirmations"
+
+
+def normalize_phone(value: str) -> str:
+    """Keep the digits of a phone number, with a leading plus: `+56955501426`."""
+    return "+" + "".join(character for character in value if character.isdigit())
+
+
+def named_customer(
+    repository: Repository, reference: str | None, phone: str | None, document: str
+) -> tuple[Row | None, str]:
+    """Return the customer a request names, and the key its failed attempts count under.
+
+    A known customer always counts under their document number, so the lockout
+    is one and the same whichever way they were named. An unknown reference or
+    phone counts under itself.
+    """
+    if reference:
+        try:
+            filters, key = {"id": str(uuid.UUID(reference))}, f"ref:{reference[:40]}"
+        except ValueError:
+            return None, f"ref:{reference[:40]}"
+    elif phone:
+        filters, key = {"phone": normalize_phone(phone)}, f"phone:{normalize_phone(phone)}"
+    else:
+        filters, key = {"document_number": document}, document
+    customers = repository.select("customers", filters)
+    return (customers[0], customers[0]["document_number"]) if customers else (None, key)
 
 
 def create(

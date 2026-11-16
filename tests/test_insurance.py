@@ -36,12 +36,16 @@ def test_eligible_customer_gets_a_choice_of_products(client: TestClient, marta: 
     assert [product["code"] for product in body["products"]] == ["CARD_FRAUD", "UNEMPLOYMENT"]
     assert body["products"][0] == {
         "code": "CARD_FRAUD",
-        "name": "Protección contra fraude de tarjeta",
-        "monthly_premium": 2990,
+        "name": "Protección de tarjeta y asistencia",
+        "monthly_premium": 2690,
         "currency": "CLP",
-        "coverage_summary": "Devuelve los cargos no autorizados hechos con la tarjeta y cubre "
-        "la reposición de la tarjeta.",
+        "coverage_summary": body["products"][0]["coverage_summary"],
+        "quote_number": body["products"][0]["quote_number"],
+        "coverage_limit": 500000,
+        "valid_until": body["products"][0]["valid_until"],
     }
+    assert "la ley no pone a cargo del banco" in body["products"][0]["coverage_summary"]
+    assert "no autorizados" not in body["products"][0]["coverage_summary"]
 
 
 @pytest.mark.parametrize(
@@ -154,7 +158,7 @@ def test_signing_the_proposal_creates_the_policy(
 
     page = client.get(path)
     assert page.status_code == 200 and "Firmar propuesta" in page.text
-    assert "Protección contra fraude de tarjeta" in page.text and "Marta" in page.text
+    assert "Protección de tarjeta y asistencia" in page.text and "Marta" in page.text
 
     signed = client.post(path)
     assert signed.status_code == 200 and "Propuesta firmada" in signed.text

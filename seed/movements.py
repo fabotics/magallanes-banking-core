@@ -1,8 +1,10 @@
 """Seed card transactions, dated relative to the day the seed runs.
 
-The story stays fresh on any day: the golden-path restaurant charge is always
-"last Sunday at lunch time, posted on Monday". Descriptors are cryptic on
-purpose, the way they look on a real statement.
+The story stays fresh on any day: the golden-path customer spent a Saturday
+evening at one restaurant, where each round was paid on its own, and the
+restaurant presented the whole weekend to the bank on Monday. So she sees
+several charges dated Monday for things she bought on Saturday night.
+Descriptors are cryptic on purpose, the way they look on a real statement.
 """
 
 from datetime import date, datetime, time, timedelta
@@ -24,10 +26,13 @@ ORDINARY_AMOUNTS = {
 SUPPORTING_CUSTOMERS = ["carolina", "jorge", "lucia", "rosa", "diego", "camila", "andres", "sofia"]
 
 
-def last_sunday(today: date) -> date:
-    """Return the most recent Sunday strictly before `today`."""
-    days_back = (today.weekday() + 1) % 7 or 7
-    return today - timedelta(days=days_back)
+# The evening at the restaurant: hour, minute and amount of each round.
+EVENING_ROUNDS = [(21, 52, 8400), (22, 37, 11200), (23, 14, 8400), (23, 58, 6900)]
+
+
+def posting_monday(today: date) -> date:
+    """Return the most recent Monday, today included: the day the evening was posted."""
+    return today - timedelta(days=today.weekday())
 
 
 def at(day: date, hour: int, minute: int) -> str:
@@ -38,13 +43,14 @@ def at(day: date, hour: int, minute: int) -> str:
 def movement(
     card: str, name: str, day: date, hour: int, minute: int, amount: float, descriptor: str,
     mcc: str, channel: str = "pos", country: str = "", tax_id: str | None = None,
-    pending: bool = False, usd: float | None = None,
+    pending: bool = False, usd: float | None = None, posted: date | None = None,
 ) -> dict:  # fmt: skip
     """Build one transaction row.
 
     A charge that is not pending is posted at the start of the next day, so a
-    posting time is never in the future. `usd` marks a foreign charge: the
-    original amount in US dollars.
+    posting time is never in the future. `posted` sets another posting day,
+    for a merchant that presents its sales late. `usd` marks a foreign charge:
+    the original amount in US dollars.
     """
     home_country = country_of(card)
     return {
@@ -60,7 +66,7 @@ def movement(
         "channel": channel,
         "country": country or home_country,
         "transaction_at": at(day, hour, minute),
-        "posted_at": None if pending else at(day + timedelta(days=1), 0, 0),
+        "posted_at": None if pending else at(posted or day + timedelta(days=1), 0, 0),
         "status": "pending" if pending else "posted",
         "is_disputed": False,
     }
@@ -72,10 +78,15 @@ def build_transactions(today: date) -> list[dict]:
     def ago(days: int) -> date:
         return today - timedelta(days=days)
 
+    monday = posting_monday(today)
+    saturday = monday - timedelta(days=2)
+    # Marta, golden path: four rounds on Saturday night, all posted on Monday.
     rows = [
-        # Marta, golden path: a restaurant she does not recognize by its descriptor.
-        movement("marta", "restaurant", last_sunday(today), 13, 42, 48900,
-                 "MERPAGO*INVGASTRO PROV", "5812", tax_id=RESTAURANT_TAX_ID),
+        movement("marta", f"restaurant-{number}", saturday, hour, minute, amount,
+                 "MERPAGO*INVGASTRO PROV", "5812", tax_id=RESTAURANT_TAX_ID, posted=monday)
+        for number, (hour, minute, amount) in enumerate(EVENING_ROUNDS, start=1)
+    ]  # fmt: skip
+    rows += [
         movement("marta", "ride", ago(1), 20, 15, 6400, "APP*VIAJES STGO", "4121",
                  channel="ecommerce", pending=True),
         movement("marta", "supermarket", ago(3), 19, 5, 37250, "SUPERMERC DON LUCHO 012", "5411"),

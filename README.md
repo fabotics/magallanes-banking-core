@@ -90,6 +90,7 @@ tests/                 one file per area, plus the in-memory repository
 | `transactions` | Card movements as on a statement: a cryptic descriptor, sometimes a merchant tax ID, never a merchant name |
 | `insurance_products` | The catalog, with the segments each product is open to |
 | `policies` | Who holds which product, with the policy number and the proposal that was signed |
+| `quotes` | The premium and limit the bank's rules give one customer for one product, valid 15 days |
 | `insurance_offers` | Every offer made and the customer's answer. The consent record |
 | `proposals` | Proposals sent, with their signing token, status, and when they were viewed and signed |
 | `cases` | Fraud cases, handoffs, complaints and callbacks, numbered `MG-<year>-<sequence>` |
@@ -109,18 +110,18 @@ Interactive documentation is served at `/docs`.
 | Method and path | Session | Purpose |
 | --- | --- | --- |
 | GET `/health` | no | Liveness and database status |
-| POST `/v1/identity/push` | no | Ask the customer to confirm their identity in the bank's app. Returns a `request_id`, pending for 90 seconds |
-| GET `/v1/identity/push/{request_id}` | no | pending, approved, denied or expired. Once approved it returns the session token |
+| POST `/v1/identity/push` | no | Ask the customer to confirm their identity in the bank's app. Name them by `customer_ref` (a conversation started inside the app), by `phone` (the caller's number, matched to the phone on file) or by `customer_id` (the national ID number they say). Returns a `request_id`, pending for 90 seconds |
+| GET `/v1/identity/push/{request_id}` | no | pending, approved, denied or expired. Once approved it returns the session token. `wait` (0 to 20 seconds) holds the request while it is pending |
 | POST `/v1/identity/verify` | no | Fallback: verify by document, card digits and birth year, and open a session |
 | GET `/v1/customers/me` | yes | First name, segment, language, products held |
 | GET `/v1/accounts/balance` | yes | Available balance per account |
 | GET `/v1/cards/transactions` | yes | Recent card movements, newest first. `days` (default 30), `status` (all, pending, posted) |
 | POST `/v1/cards/block` | yes | Temporary block. Returns a reference |
 | POST `/v1/cases` | handoff: optional | Fraud case, handoff, complaint or callback. Returns a case number |
-| GET `/v1/insurance/eligibility` | yes | Products the bank pre-approves, or the reason there are none |
+| GET `/v1/insurance/eligibility` | yes | Products the bank pre-approves, each with a personal quote (number, premium, limit per event, valid until), or the reason there are none |
 | POST `/v1/insurance/offers` | yes | Record an offer and the answer: accepted, declined, info_requested |
 | POST `/v1/insurance/proposals` | yes | Create the proposal for an offer and send it by email and to the customer's chat. Accepted offers get a signing link |
-| GET `/v1/insurance/proposals/{proposal_number}` | yes | pending, signed or expired. Once signed: the policy number and the start date |
+| GET `/v1/insurance/proposals/{proposal_number}` | yes | pending, signed or expired. Once signed: the policy number and the start date. `wait` (0 to 20 seconds) holds the request while it is unsigned |
 | POST `/v1/notifications/call-summary` | yes | Send a written summary of the call to the customer's messaging channel (Telegram) |
 | GET `/v1/registry/merchants/{tax_id}` | no | The business behind a merchant tax ID |
 | `/app` and `/app/...` | PIN | The customer app, described below |
@@ -201,9 +202,9 @@ uvicorn app.main:app --reload
 
 | Customer | Document | Card | Birth year | Story |
 | --- | --- | --- | --- | --- |
-| Marta | 31.415.926-8 | 4821 | 1986 | Does not recognize a restaurant charge from last Sunday. Eligible for insurance |
+| Marta | 31.415.926-8 | 4821 | 1986 | Sees four charges dated Monday and bought nothing on Monday: four rounds at one restaurant on Saturday night, posted together. Eligible for insurance |
 | Pedro Pablo | 32.718.281-1 | 7730 | 1979 | Two online charges at night from abroad, in dollars |
-| Carolina | 33.161.803-9 | 1164 | 1991 | Already holds the card fraud product |
+| Carolina | 33.161.803-9 | 1164 | 1991 | Already holds the card product |
 | Jorge | 30.577.215-1 | 9052 | 1948 | Flagged as vulnerable: offers go to a human advisor |
 | Lucia | 34.141.421-0 | 3378 | 1995 | Her card is already blocked |
 
@@ -257,13 +258,15 @@ The API runs on Vercel as one Python function with no extra configuration: `app/
 Each endpoint maps to one webhook tool on any agent platform that can call HTTP APIs.
 
 - Store `BANK_API_KEY` as a secret on the platform and send it in `X-API-Key` on every tool.
-- Verify identity in the app first: call `identity/push` with the document number the customer says, keep `request_id`, tell the customer to approve the request in the app, and read the result when they say they did. Read it at most a few times; if it stays pending, or comes back denied or expired, fall back to `identity/verify`. `push` answers the same for a document the bank does not know, so the agent learns nothing from it.
+- Verify identity in the app first. If the channel already says who the customer is, send that to `identity/push` and ask for nothing: `customer_ref` for a conversation started inside the app, `phone` for a call. Otherwise ask for the document number and send it as `customer_id`. Keep `request_id`, tell the customer to approve the request in the app, and read the result with `wait=20` straight away: the answer arrives the moment the customer approves, so they never have to say they did. Read it at most a few times; if it stays pending, or comes back denied or expired, fall back to `identity/verify`. `push` answers the same for a document the bank does not know, so the agent learns nothing from it.
 - After either path, keep `session_token` for the rest of the conversation and send it in `X-Session-Token`.
 - Pass the platform's conversation ID as `conversation_id` when verifying. The API then ties every later call, case and offer to that conversation.
 - Keep `offer_id` from `offers` to request the proposal, and read `case_number` and block `reference` back to the customer.
-- After `proposals`, tell the customer where the link is and that nothing is active until they sign. If they sign while still on the call, read the proposal status once and confirm the policy number and start date. The catalog is written in the customers' language, so the agent says names, cover and prices as they come.
+- After `proposals`, tell the customer where the link is and that nothing is active until they sign. If they sign while still on the call, read the proposal status with `wait=20` and confirm the policy number and start date as soon as it says signed. The catalog is written in the customers' language, so the agent says names, cover and prices as they come.
 - `transactions` waits about one second before answering, like a legacy system would. Have the agent say something while it waits.
 - At the end of the conversation, send a short `call summary`. The API delivers it to the channel the bank has on file and answers `sent: false` when there is none.
+- `eligibility` returns a quote per product. The premium and the limit are computed by the bank's rules from the customer's segment and age (`app/quotes.py`): the agent reads them out and never changes them. The quote number is kept on the offer, the proposal and the contract.
+- The card product covers only what the law does not already place on a card issuer (cash stolen after a withdrawal, emergency money, replacing documents, assistance). Refunding unauthorized charges is the issuer's own duty and is never sold as insurance.
 - When `eligibility` answers `eligible: false`, the agent makes no offer. When `verify` answers `locked: true` or `push` answers `status: locked`, the agent opens a handoff case.
 - A handoff for a caller who is not verified has no session token to send. If your platform refuses a tool call when a header variable is empty, give that handoff its own tool without the `X-Session-Token` header.
 
