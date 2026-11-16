@@ -36,6 +36,7 @@ TEXTS = {
     "document_label": "ID number (RUT)",
     "login_wrong": "The ID number or the PIN is not right. Check them and try again.",
     "not_you": "Not {name}? Log in as someone else",
+    "prefer_call": "Prefer to call?",
     "pin_locked": "Too many attempts. Wait one minute and try again.",
     "not_enrolled_title": "App not available",
     "not_enrolled_text": "This app is not linked to a customer. Open the link the bank sent you.",

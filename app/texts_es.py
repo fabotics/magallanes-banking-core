@@ -34,6 +34,7 @@ TEXTS = {
     "document_label": "RUT o número de documento",
     "login_wrong": "El documento o el PIN no coinciden. Revise e intente de nuevo.",
     "not_you": "¿No es {name}? Ingresar con otra persona",
+    "prefer_call": "¿Prefiere llamar?",
     "pin_locked": "Demasiados intentos. Espere un minuto e intente de nuevo.",
     "not_enrolled_title": "App no disponible",
     "not_enrolled_text": "Esta app no está asociada a un cliente. Abra el enlace que le envió "

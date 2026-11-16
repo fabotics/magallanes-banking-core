@@ -27,5 +27,9 @@
   {% if customer %}
   <p class="small"><a href="{{ other }}">{{ t.not_you.format(name=customer.first_name) }}</a></p>
   {% endif %}
+  {% if phone_line %}
+  {# Another way in for someone who cannot or does not want to sign in. #}
+  <p class="small">{{ t.prefer_call }} <a href="tel:{{ phone_dial }}">{{ phone_line }}</a></p>
+  {% endif %}
   <p class="muted small">{{ t.pin_warning }}</p>
 {% endblock %}
