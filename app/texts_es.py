@@ -5,6 +5,22 @@ TEXTS = {
     "footer": "Banco Magallanes es un banco ficticio. Sitio de demostración, sin clientes ni "
     "operaciones reales.",
     "back_home": "Volver al inicio",
+    "tabs_label": "Secciones",
+    "tab_home": "Inicio",
+    "tab_assistant": "Asistente",
+    # Talking to the bank
+    "assistant_cta": "Hablar con el banco",
+    "assistant_cta_hint": "Por voz o por chat, con el asistente virtual.",
+    "assistant_title": "Asistente",
+    "assistant_heading": "Hable con el banco",
+    "assistant_text": "Use el botón de conversación de abajo. Como ya ingresó con su PIN, el "
+    "asistente sabe a qué app enviar la confirmación y no le pedirá su número de documento.",
+    "assistant_live": "Lo que el asistente le envíe aparece aquí, sin salir de la conversación.",
+    "assistant_off_title": "Asistente no disponible",
+    "assistant_off_text": "La conversación con el asistente no está activada en este sitio.",
+    "live_confirm": "¿Es usted? Confirme su identidad",
+    "live_proposal": "Su propuesta está lista",
+    "read_and_sign": "Leer y firmar",
     # PIN screen
     "login_title": "Ingreso",
     "hello": "Hola, {name}",

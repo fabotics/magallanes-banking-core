@@ -5,6 +5,7 @@ sent to the PIN screen and comes back to the same page afterwards.
 """
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
@@ -12,6 +13,7 @@ from fastapi.responses import HTMLResponse, Response
 
 from app import app_session, audit, confirmations, contracts, i18n, quotes, signature
 from app.clock import bank_date, parse_time, utc_now
+from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.formatting import card_label, long_date, money
 
@@ -46,17 +48,35 @@ def named(repository: Repository, rows: list[Row], language: str) -> list[Row]:
     return rows
 
 
+def waiting_items(
+    repository: Repository, customer: Row, language: str, now: datetime
+) -> tuple[list[Row], list[Row]]:
+    """Return what is waiting for the customer: confirmations to answer, proposals to sign."""
+    owned = {"customer_id": customer["id"]}
+    pending = repository.select(confirmations.TABLE, {**owned, "status": "pending"})
+    sent = repository.select("proposals", {**owned, "status": "sent"})
+    to_sign = [
+        p for p in sent if p["signing_token"] and signature.proposal_status(p, now) == "pending"
+    ]
+    return (
+        [c for c in pending if confirmations.current_status(c, now) == "pending"],
+        named(repository, to_sign, language),
+    )
+
+
 @router.get("/app/home", response_class=HTMLResponse)
-def home(request: Request, repository: Annotated[Repository, Depends(get_repository)]) -> Response:
+def home(
+    request: Request,
+    repository: Annotated[Repository, Depends(get_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Response:
     """Show who is signed in, their card, and what is waiting for them."""
     customer = app_session.current_customer(request, repository)
     if customer is None:
         return app_session.to_login(request)
-    now = utc_now()
     language = i18n.pick_language(request)
     owned = {"customer_id": customer["id"]}
-    waiting = repository.select(confirmations.TABLE, {**owned, "status": "pending"})
-    proposals = repository.select("proposals", {**owned, "status": "sent"})
+    waiting, proposals = waiting_items(repository, customer, language, utc_now())
     policies = repository.select("policies", {**owned, "status": "active"})
     for policy in policies:
         policy["start"] = long_date(bank_date(parse_time(policy["started_at"])), language)
@@ -64,18 +84,12 @@ def home(request: Request, repository: Annotated[Repository, Depends(get_reposit
     label = card_label(cards[0], language) if cards else ""
     context = {
         "signed_in": True,
+        "tab": "home",
+        "assistant": bool(settings.assistant_embed_html),
         "customer": customer,
         "card": {**cards[0], "label": label[:1].upper() + label[1:]} if cards else None,
-        "confirmations": [c for c in waiting if confirmations.current_status(c, now) == "pending"],
-        "proposals": named(
-            repository,
-            [
-                p
-                for p in proposals
-                if p["signing_token"] and signature.proposal_status(p, now) == "pending"
-            ],
-            language,
-        ),
+        "confirmations": waiting,
+        "proposals": proposals,
         "policies": named(repository, policies, language),
     }
     return app_session.page(request, "home", context)

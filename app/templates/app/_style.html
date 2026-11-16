@@ -1,0 +1,123 @@
+{# The bank's visual identity: the strait at dusk (deep green-blue), ice, and a copper accent. #}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap">
+<style>
+  :root { --deep: #0b2530; --sea: #0f4c5c; --tide: #1b6b7a; --ice: #eef4f3; --paper: #fbfcfb;
+          --ink: #10242b; --muted: #5f7379; --line: #dbe5e4; --copper: #c2622a;
+          --copper-soft: #fbeee4; --ok: #1c7a4b; --bad: #a8322a; --accent: var(--sea);
+          --soft: var(--ice); --radius: 16px;
+          --display: "Fraunces", Georgia, "Times New Roman", serif;
+          --text: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 500 15.5px/1.5 var(--text);
+         -webkit-font-smoothing: antialiased; }
+  .device { min-height: 100dvh; display: flex; flex-direction: column; background: var(--paper); }
+  .statusbar { display: none; }
+  .appbar { display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+            padding: .85rem 1.15rem; background: var(--deep); color: #fff; }
+  .brand { display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none;
+           font: 600 1.12rem/1 var(--display); letter-spacing: .01em; }
+  .brand svg { width: 30px; height: 30px; flex: none; }
+  .brand small { display: block; font: 600 .58rem/1 var(--text); letter-spacing: .2em;
+                 text-transform: uppercase; color: #9fc3c6; margin-bottom: .22rem; }
+  .langs { display: flex; gap: .1rem; padding: .15rem; border-radius: 99px;
+           background: rgba(255, 255, 255, .1); font-size: .72rem; font-weight: 700; }
+  .langs a { padding: .22rem .55rem; border-radius: 99px; color: #b9d3d5; text-decoration: none; }
+  .langs a[aria-current] { background: #fff; color: var(--deep); }
+  main { flex: 1; padding: 1.4rem 1.15rem 1.75rem; }
+  h1 { font: 600 1.6rem/1.15 var(--display); margin: 0 0 .3rem; letter-spacing: -.01em; }
+  h2 { font: 700 .7rem/1 var(--text); margin: 1.9rem 0 .7rem; color: var(--muted);
+       text-transform: uppercase; letter-spacing: .16em; }
+  p { margin: .55rem 0; }
+  .muted { color: var(--muted); }
+  .small { font-size: .84rem; }
+  .card { display: block; border: 1px solid var(--line); border-radius: var(--radius);
+          padding: .95rem 1.05rem; margin: .6rem 0; background: #fff; color: inherit;
+          text-decoration: none; }
+  a.card { position: relative; padding-right: 2.4rem; }
+  a.card::after { content: ""; position: absolute; right: 1.1rem; top: 50%; width: .5rem;
+                  height: .5rem; border-right: 2px solid var(--muted);
+                  border-top: 2px solid var(--muted); transform: translateY(-50%) rotate(45deg); }
+  a.card:hover, a.card:focus-visible { border-color: var(--sea); outline: none; }
+  .card strong { display: block; font-weight: 700; margin: .15rem 0; }
+  .plastic { position: relative; overflow: hidden; border: 0; color: #fff; margin: 1.1rem 0 .4rem;
+             padding: 1.15rem 1.2rem 1.1rem; border-radius: 20px; min-height: 11.2rem;
+             background: linear-gradient(135deg, var(--deep) 0%, var(--sea) 62%, var(--tide) 100%);
+             box-shadow: 0 14px 28px -14px rgba(11, 37, 48, .7); display: flex;
+             flex-direction: column; justify-content: space-between; }
+  .plastic::before { content: ""; position: absolute; inset: auto -30% -65% auto; width: 22rem;
+                     height: 22rem; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .14);
+                     box-shadow: 0 0 0 2.2rem rgba(255, 255, 255, .04),
+                                 0 0 0 4.6rem rgba(255, 255, 255, .03); }
+  .plastic .row { display: flex; justify-content: space-between; align-items: flex-start;
+                  position: relative; }
+  .plastic .chip { width: 2.3rem; height: 1.7rem; border-radius: 6px;
+                   background: linear-gradient(135deg, #e3b98f, var(--copper)); }
+  .plastic .number { font: 600 1.12rem/1 var(--text); letter-spacing: .16em;
+                     font-variant-numeric: tabular-nums; position: relative; }
+  .plastic .label { font-size: .78rem; color: #cfe2e3; position: relative; }
+  .tag { display: inline-block; font-size: .68rem; font-weight: 700; padding: .2rem .55rem;
+         border-radius: 99px; background: var(--copper-soft); color: var(--copper);
+         letter-spacing: .04em; text-transform: uppercase; }
+  .talk { display: flex; align-items: center; gap: .9rem; border: 0; background: var(--ice); }
+  .talk svg { width: 2.6rem; height: 2.6rem; flex: none; }
+  .code { font: 600 2.2rem/1 var(--display); letter-spacing: .28em; text-align: center;
+          padding: 1.15rem 0 1.15rem .28em; margin: 1rem 0; background: var(--ice);
+          border-radius: var(--radius); font-variant-numeric: tabular-nums; }
+  button, .button { display: block; width: 100%; padding: .95rem 1rem; border-radius: 14px;
+          border: 1.5px solid var(--sea); background: var(--sea); color: #fff;
+          font: 700 .98rem/1.2 var(--text); cursor: pointer; text-align: center;
+          text-decoration: none; }
+  button:hover, .button:hover { background: var(--deep); border-color: var(--deep); }
+  button.secondary, .button.secondary { background: transparent; color: var(--sea); }
+  button.secondary:hover, .button.secondary:hover { background: var(--ice); }
+  button + button, form + form { margin-top: .6rem; }
+  .pin { width: 100%; padding: .85rem 0 .85rem .6em; font: 600 1.9rem/1 var(--display);
+         text-align: center; letter-spacing: .6em; border: 1.5px solid var(--line);
+         border-radius: 14px; margin: 1.1rem 0; background: #fff; color: var(--ink); }
+  .pin:focus, .signature:focus { outline: 2px solid var(--copper); outline-offset: 2px; }
+  .error { color: var(--bad); font-weight: 700; }
+  .ok { color: var(--ok); font-weight: 700; }
+  dl { display: grid; grid-template-columns: auto 1fr; gap: .45rem 1rem; margin: 1rem 0; }
+  dt { color: var(--muted); }
+  dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+  .fineprint { padding: .9rem 1.15rem 1.1rem; color: var(--muted); font-size: .7rem;
+               border-top: 1px solid var(--line); }
+  .tabs { display: flex; position: sticky; bottom: 0; background: #fff;
+          border-top: 1px solid var(--line); padding: .35rem .5rem calc(.35rem + env(safe-area-inset-bottom)); }
+  .tabs form { flex: 1; margin: 0; }
+  .tabs a, .tabs button { flex: 1; display: flex; flex-direction: column; align-items: center;
+          gap: .2rem; width: 100%; padding: .4rem .2rem; border: 0; border-radius: 12px;
+          background: none; color: var(--muted); font: 700 .66rem/1 var(--text);
+          text-decoration: none; cursor: pointer; }
+  .tabs svg { width: 1.45rem; height: 1.45rem; fill: none; stroke: currentColor;
+              stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs a[aria-current], .tabs a:hover, .tabs button:hover { color: var(--sea); background: var(--ice); }
+
+  /* A wide screen shows the app the way it is used: inside a phone. */
+  @media (min-width: 46rem) and (min-height: 38rem) {
+    body { display: grid; place-items: center; padding: 1.5rem;
+           background: radial-gradient(120% 90% at 50% 0%, #17525f 0%, var(--deep) 55%, #061820 100%); }
+    /* The transform makes the phone the frame of reference for anything fixed inside it. */
+    .device { width: 24.4rem; height: min(52.5rem, calc(100dvh - 3rem)); min-height: 0;
+              border: .62rem solid #050f13; border-radius: 3.1rem; overflow: hidden;
+              transform: translateZ(0);
+              box-shadow: 0 0 0 1.5px #2b3d43, 0 40px 80px -30px rgba(0, 0, 0, .75); }
+    .statusbar { display: flex; justify-content: space-between; align-items: center;
+                 position: relative; padding: .7rem 1.6rem .35rem; background: var(--deep);
+                 color: #fff; font: 700 .8rem/1 var(--text); }
+    .statusbar::after { content: ""; position: absolute; left: 50%; top: .5rem; width: 5.6rem;
+                        height: 1.45rem; border-radius: 99px; background: #050f13;
+                        transform: translateX(-50%); }
+    .statusbar svg { height: .72rem; fill: #fff; }
+    .scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column;
+              scrollbar-width: none; }
+    .scroll::-webkit-scrollbar { display: none; }
+    .tabs { position: static; padding-bottom: .9rem; }
+  }
+  @media not ((min-width: 46rem) and (min-height: 38rem)) {
+    .scroll { flex: 1; display: flex; flex-direction: column; }
+  }
+</style>
