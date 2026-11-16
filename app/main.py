@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, FastAPI, Request
 
-from app import __version__, db
+from app import __version__, db, mcp_server
 from app.audit import audit_middleware
 from app.config import Settings, get_settings
 from app.errors import register_error_handlers
@@ -60,6 +60,8 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
     app.include_router(v1)
     # The signature page is public: the customer opens it from a link, without an API key.
     app.include_router(signing.router)
+    # The MCP endpoint checks the same API key itself, in a header or as a bearer token.
+    app.include_router(mcp_server.router)
     return app
 
 
