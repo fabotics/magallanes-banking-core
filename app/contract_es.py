@@ -1,7 +1,7 @@
 """The wording of the insurance contract, in Spanish.
 
 Same pages and same clauses, in the same order, as `contract_en.py`.
-`{premium}` and `{card}` are filled in for each customer.
+`{premium}`, `{card}` and `{limit}` are filled in for each customer.
 """
 
 TEXT = {
@@ -26,21 +26,30 @@ TEXT = {
         "Prima mensual",
         "Medio de pago",
         "Vigencia",
+        "Cotización N°",
+        "Límite por evento",
     ],  # fmt: skip
     "term": "Mensual, con renovación automática. Comienza el día de la firma.",
     "any_card": "tarjeta del asegurado",
     "products": {},
     "cover": {
         "CARD_FRAUD": [
-            "Cargos no autorizados: se reembolsan los cargos hechos con la tarjeta sin el "
-            "consentimiento del asegurado, por robo, hurto, extravío, clonación o uso "
-            "fraudulento de sus datos, en comercios presenciales o electrónicos.",
-            "Reposición de la tarjeta: se cubre el costo de emitir y despachar la tarjeta de "
-            "reemplazo.",
-            "Límite: hasta $3.000.000 por evento, con un máximo de dos eventos por año de "
-            "vigencia.",
-            "Aviso: el asegurado debe avisar al banco dentro de los 30 días siguientes a la "
-            "fecha del cargo que desconoce.",
+            "Robo de efectivo después de un giro: se repone el dinero que le roben al "
+            "asegurado, con violencia o intimidación, dentro de las dos horas siguientes a un "
+            "giro en cajero automático hecho con la tarjeta.",
+            "Dinero de emergencia: si la tarjeta queda bloqueada por robo, hurto o extravío, "
+            "se paga al asegurado una suma para gastos urgentes mientras llega la tarjeta de "
+            "reemplazo, hasta el 20% del límite por evento.",
+            "Reposición de documentos y llaves: se reembolsa el costo de reponer la cédula de "
+            "identidad, la licencia de conducir, el pasaporte y las llaves robados o "
+            "extraviados junto con la tarjeta.",
+            "Asistencia: orientación telefónica las 24 horas para bloquear documentos, hacer "
+            "la denuncia y presentar el reclamo ante el banco.",
+            "Límite: hasta {limit} por evento, con un máximo de dos eventos por año de vigencia.",
+            "Lo que esta póliza no reemplaza: anular o devolver las operaciones que el "
+            "asegurado no autorizó es una obligación que la ley pone a cargo del emisor de la "
+            "tarjeta, sin costo. Esta póliza no cubre ese riesgo y no se necesita para ejercer "
+            "ese derecho.",
         ],
         "UNEMPLOYMENT": [
             "Cesantía involuntaria: se paga el pago mínimo de la tarjeta por hasta seis meses "
@@ -55,11 +64,12 @@ TEXT = {
     },
     "exclusions": {
         "CARD_FRAUD": [
-            "Cargos hechos por el asegurado, o por una persona a quien entregó voluntariamente "
-            "su tarjeta o sus claves.",
-            "Cargos anteriores a la fecha de inicio de la vigencia.",
+            "Las operaciones no autorizadas hechas con la tarjeta, que la ley pone a cargo del "
+            "emisor.",
+            "Robo de efectivo sin violencia ni intimidación, o después de las dos horas "
+            "siguientes al giro.",
+            "Hechos que no se denuncien a la policía dentro de las 48 horas siguientes.",
             "Hechos causados con dolo o culpa grave del asegurado.",
-            "Pérdidas indirectas, intereses y lucro cesante.",
         ],
         "UNEMPLOYMENT": [
             "Renuncia voluntaria y término de un contrato a plazo fijo en la fecha pactada.",

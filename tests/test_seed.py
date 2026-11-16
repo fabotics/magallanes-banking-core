@@ -45,16 +45,24 @@ def test_demo_email_goes_to_the_golden_path_customer_only() -> None:
 
 
 @pytest.mark.parametrize("today", ONE_WEEK)
-def test_restaurant_charge_is_last_sunday_at_lunch_posted_on_monday(today: date) -> None:
+def test_the_evening_is_four_saturday_rounds_all_posted_on_monday(today: date) -> None:
     seed = build_seed(today)
-    charge = next(row for row in seed["transactions"] if row["merchant_tax_id"])
-    made = datetime.fromisoformat(charge["transaction_at"])
-    posted = datetime.fromisoformat(charge["posted_at"])
-    assert charge["card_id"] == seed_id("card/marta")
-    assert charge["merchant_tax_id"] == RESTAURANT_TAX_ID
-    assert made.weekday() == 6 and made.hour == 13
-    assert 1 <= (today - made.date()).days <= 7
-    assert posted.weekday() == 0 and charge["status"] == "posted"
+    rounds = [row for row in seed["transactions"] if row["merchant_tax_id"]]
+    assert len(rounds) == 4 and sum(row["amount"] for row in rounds) == 34900
+    assert {row["card_id"] for row in rounds} == {seed_id("card/marta")}
+    assert {row["merchant_tax_id"] for row in rounds} == {RESTAURANT_TAX_ID}
+    assert {row["descriptor"] for row in rounds} == {"MERPAGO*INVGASTRO PROV"}
+    made = [datetime.fromisoformat(row["transaction_at"]) for row in rounds]
+    posted = {datetime.fromisoformat(row["posted_at"]).date() for row in rounds}
+    assert {moment.weekday() for moment in made} == {5} and min(m.hour for m in made) >= 21
+    # One posting day for all four: the Monday after, never later than today.
+    assert len(posted) == 1 and posted.pop().weekday() == 0
+    assert 0 <= (today - datetime.fromisoformat(rounds[0]["posted_at"]).date()).days <= 6
+
+
+def test_every_customer_has_a_phone_on_file() -> None:
+    phones = [row["phone"] for row in build_seed(WEDNESDAY)["customers"]]
+    assert len(set(phones)) == 10 and all(phone.startswith("+") for phone in phones)
 
 
 def test_golden_path_customer_has_one_pending_charge_and_no_policy() -> None:

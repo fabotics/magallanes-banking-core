@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from app import audit, confirmations
+from app import audit, confirmations, waiting
 from app.clock import utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, get_repository
@@ -35,14 +35,21 @@ def request_confirmation(
 ) -> PushResponse:
     """Create a pending confirmation and notify the customer. Never says if they exist."""
     now = utc_now()
-    document = normalize_document(body.customer_id)
-    audit.note(request, conversation_id=body.conversation_id, document=audit.mask(document))
+    spoken = normalize_document(body.customer_id or "")
+    customer, document = confirmations.named_customer(
+        repository, body.customer_ref, body.phone, spoken
+    )
+    named_by = "reference" if body.customer_ref else "phone" if body.phone else "document"
+    audit.note(
+        request,
+        conversation_id=body.conversation_id,
+        document=audit.mask(document),
+        named_by=named_by,
+    )
     if recent_failures(repository, document, now) >= MAX_FAILED_ATTEMPTS:
         audit.note(request, outcome="locked")
         return PushResponse(status="locked")
 
-    customers = repository.select("customers", {"document_number": document})
-    customer = customers[0] if customers else None
     confirmation = confirmations.create(repository, document, customer, body.conversation_id, now)
     notified = customer is not None and confirmations.notify(settings, customer, confirmation)
     audit.note(
@@ -67,12 +74,21 @@ def confirmation_status(
     request_id: uuid.UUID,
     request: Request,
     repository: Annotated[Repository, Depends(get_repository)],
+    wait: waiting.Wait = 0,
 ) -> PushStatusResponse:
-    """Say where the confirmation stands. Once approved, hand over the session."""
-    found = repository.select(confirmations.TABLE, {"id": str(request_id)})
-    if not found:
+    """Say where the confirmation stands. Once approved, hand over the session.
+
+    With `wait`, the answer is held while the request is pending, so the
+    caller learns of the customer's answer without asking again.
+    """
+    filters = {"id": str(request_id)}
+    if not repository.select(confirmations.TABLE, filters):
         raise ApiError(404, "request_not_found", "No such confirmation request.")
-    confirmation = found[0]
+    confirmation = waiting.until_settled(
+        lambda: repository.select(confirmations.TABLE, filters)[0],
+        lambda row: confirmations.current_status(row, utc_now()) != "pending",
+        wait,
+    )
     now = utc_now()
     status = confirmations.current_status(confirmation, now)
     audit.note(

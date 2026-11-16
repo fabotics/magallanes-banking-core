@@ -48,7 +48,7 @@ def test_transactions_are_newest_first_and_only_the_customers(
 ) -> None:
     body = client.get("/v1/cards/transactions", headers=marta).json()
     times = [parse_time(t["transaction_at"]) for t in body["transactions"]]
-    assert body["count"] == 7 and times == sorted(times, reverse=True)
+    assert body["count"] == 10 and times == sorted(times, reverse=True)
     assert {t["card_last4"] for t in body["transactions"]} == {"4821"}
 
 
@@ -66,13 +66,13 @@ def test_restaurant_charge_shows_descriptor_and_tax_id_not_a_name(
 def test_status_filter_and_pending_shape(client: TestClient, marta: dict) -> None:
     pending = client.get("/v1/cards/transactions?status=pending", headers=marta).json()
     posted = client.get("/v1/cards/transactions?status=posted", headers=marta).json()
-    assert pending["count"] == 1 and posted["count"] == 6
+    assert pending["count"] == 1 and posted["count"] == 9
     assert pending["transactions"][0]["posted_at"] is None
 
 
 def test_days_filter_and_foreign_currency_fields(client: TestClient, marta: dict) -> None:
     week = client.get("/v1/cards/transactions?days=7", headers=marta).json()
-    assert 3 <= week["count"] < 7
+    assert 3 <= week["count"] < 10
     everything = client.get("/v1/cards/transactions", headers=marta).json()["transactions"]
     foreign = [t for t in everything if t["country"] != "CL"]
     assert len(foreign) == 1

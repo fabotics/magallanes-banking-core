@@ -12,7 +12,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
 
-from app import app_session, contracts, i18n, signature
+from app import app_session, contracts, i18n, quotes, signature
 from app.clock import bank_date, parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
@@ -32,7 +32,7 @@ def find_proposal(repository: Repository, customer: Row, number: str) -> Row | N
 
 def build_contract(repository: Repository, customer: Row, proposal: Row, language: str) -> dict:
     """Build the contract for this proposal in one language."""
-    product = repository.select("insurance_products", {"code": proposal["product_code"]})[0]
+    product = quotes.for_proposal(repository, proposal)
     cards = repository.select("cards", {"customer_id": customer["id"]})
     issued = bank_date(parse_time(proposal["created_at"]))
     card = cards[0] if cards else None

@@ -111,6 +111,19 @@ create table if not exists proposals (
     signed_at timestamptz
 );
 
+-- The price and limit the bank quotes one customer for one product. Valid 15 days.
+create table if not exists quotes (
+    id uuid primary key default gen_random_uuid(),
+    quote_number text not null unique,
+    customer_id uuid not null references customers (id),
+    product_code text not null references insurance_products (code),
+    monthly_premium numeric(14, 2) not null,
+    currency text not null,
+    coverage_limit numeric(14, 2) not null,
+    created_at timestamptz not null default now(),
+    valid_until timestamptz not null
+);
+
 -- Columns added after the first release. A database created by an earlier
 -- version of this file gets them here; on a new database these lines do nothing.
 alter table policies add column if not exists policy_number text unique;
@@ -119,6 +132,8 @@ alter table customers add column if not exists app_failed_pins integer not null 
 alter table customers add column if not exists app_locked_until timestamptz;
 alter table policies add column if not exists proposal_id uuid;
 alter table proposals add column if not exists viewed_at timestamptz;
+alter table insurance_offers add column if not exists quote_number text;
+alter table proposals add column if not exists quote_number text;
 
 -- A policy points back to the proposal the customer signed. Added here because
 -- `policies` is created before `proposals`.
@@ -214,6 +229,7 @@ create index if not exists cards_customer_idx on cards (customer_id);
 create index if not exists transactions_card_idx on transactions (card_id, transaction_at desc);
 create index if not exists policies_customer_idx on policies (customer_id);
 create index if not exists offers_customer_idx on insurance_offers (customer_id);
+create index if not exists quotes_customer_idx on quotes (customer_id);
 create index if not exists cases_customer_idx on cases (customer_id);
 create index if not exists attempts_document_idx
     on verification_attempts (document_number, created_at desc);
@@ -228,6 +244,7 @@ alter table transactions enable row level security;
 alter table insurance_products enable row level security;
 alter table policies enable row level security;
 alter table insurance_offers enable row level security;
+alter table quotes enable row level security;
 alter table proposals enable row level security;
 alter table cases enable row level security;
 alter table verification_sessions enable row level security;
