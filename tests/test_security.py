@@ -32,20 +32,20 @@ def test_unconfigured_key_fails_closed(app: FastAPI) -> None:
 
 def test_session_token_is_accepted_in_the_header(client: TestClient, marta_token: str) -> None:
     headers = {**API_KEY, "X-Session-Token": marta_token}
-    response = client.get("/v1/session-probe", headers=headers)
-    assert response.json() == {"customer_id": seed_id("customer/marta")}
+    response = client.get("/v1/customers/me", headers=headers)
+    assert response.json()["first_name"] == "Marta"
 
 
 def test_session_token_is_accepted_as_a_query_parameter(
     client: TestClient, marta_token: str
 ) -> None:
-    response = client.get(f"/v1/session-probe?session_token={marta_token}", headers=API_KEY)
+    response = client.get(f"/v1/customers/me?session_token={marta_token}", headers=API_KEY)
     assert response.status_code == 200
 
 
 def test_missing_or_unknown_session_is_rejected(client: TestClient) -> None:
     for headers in (API_KEY, {**API_KEY, "X-Session-Token": "not-a-session"}):
-        response = client.get("/v1/session-probe", headers=headers)
+        response = client.get("/v1/customers/me", headers=headers)
         assert response.status_code == 401
         assert response.json()["error"] == "identity_not_verified"
 
@@ -62,7 +62,7 @@ def test_expired_session_is_rejected(client: TestClient, repository: InMemoryRep
             "expires_at": (an_hour_ago + timedelta(minutes=15)).isoformat(),
         },
     )
-    response = client.get("/v1/session-probe", headers={**API_KEY, "X-Session-Token": "old-token"})
+    response = client.get("/v1/customers/me", headers={**API_KEY, "X-Session-Token": "old-token"})
     assert response.status_code == 401
 
 

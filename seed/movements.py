@@ -42,8 +42,9 @@ def movement(
 ) -> dict:  # fmt: skip
     """Build one transaction row.
 
-    A charge that is not pending is posted in the overnight batch of the next
-    day. `usd` marks a foreign charge: the original amount in US dollars.
+    A charge that is not pending is posted at the start of the next day, so a
+    posting time is never in the future. `usd` marks a foreign charge: the
+    original amount in US dollars.
     """
     home_country = country_of(card)
     return {
@@ -59,7 +60,7 @@ def movement(
         "channel": channel,
         "country": country or home_country,
         "transaction_at": at(day, hour, minute),
-        "posted_at": None if pending else at(day + timedelta(days=1), 0, 30),
+        "posted_at": None if pending else at(day + timedelta(days=1), 0, 0),
         "status": "pending" if pending else "posted",
         "is_disputed": False,
     }

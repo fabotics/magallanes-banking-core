@@ -28,7 +28,7 @@ def test_a_verified_call_is_recorded_with_customer_and_conversation(
 def test_no_secret_reaches_the_audit_log(
     client: TestClient, repository: InMemoryRepository, marta_token: str
 ) -> None:
-    client.get(f"/v1/session-probe?session_token={marta_token}", headers=API_KEY)
+    client.get(f"/v1/customers/me?session_token={marta_token}", headers=API_KEY)
     stored = json.dumps(repository.select("audit_log"))
     assert marta_token not in stored
     assert "314159268" not in stored
@@ -47,7 +47,7 @@ def test_failed_and_denied_calls_are_recorded(
 def test_session_calls_carry_the_customer(
     client: TestClient, repository: InMemoryRepository, marta_token: str
 ) -> None:
-    client.get("/v1/session-probe", headers={**API_KEY, "X-Session-Token": marta_token})
+    client.get("/v1/customers/me", headers={**API_KEY, "X-Session-Token": marta_token})
     row = repository.select("audit_log")[-1]
     assert row["customer_id"] == seed_id("customer/marta")
     assert row["conversation_id"] == "conv-test" and row["outcome"] == "ok"

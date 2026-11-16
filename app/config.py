@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     bank_api_key: str = ""
     public_base_url: str = "http://localhost:8000"
     demo_customer_email: str = ""
+    transactions_delay_seconds: float = 1.0
 
 
 @lru_cache
