@@ -10,6 +10,7 @@ from datetime import date, datetime, timedelta
 from seed.helpers import seed_id
 from seed.movements import BANK_TIMEZONE, at, build_transactions
 from seed.people import build_accounts, build_cards, build_customers
+from seed.registry import build_registry
 
 # Every table, parents before children. Insert in this order, delete in reverse.
 TABLES = [
@@ -25,7 +26,11 @@ TABLES = [
     "verification_sessions",
     "verification_attempts",
     "audit_log",
+    "registry_merchants",
 ]
+
+# Tables whose primary key is not a generated `id`.
+PRIMARY_KEYS = {"insurance_products": "code", "registry_merchants": "tax_id"}
 
 FRAUD_PRODUCT = "CARD_FRAUD"
 
@@ -73,6 +78,7 @@ def build_seed(today: date | None = None, demo_email: str = "") -> dict[str, lis
     rows["accounts"] = build_accounts(now_iso=at(today, 0, 0))
     rows["cards"] = build_cards(blocked_at_iso=at(today - timedelta(days=3), 16, 20))
     rows["transactions"] = build_transactions(today)
+    rows["registry_merchants"] = build_registry()
     rows["policies"] = [
         {
             "id": seed_id("policy/carolina/fraud"),

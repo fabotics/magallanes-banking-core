@@ -152,6 +152,17 @@ create table if not exists audit_log (
     detail jsonb not null default '{}'
 );
 
+-- Stand-in for the public company registry: who is behind a merchant tax ID.
+create table if not exists registry_merchants (
+    tax_id text primary key,
+    legal_name text not null,
+    trade_name text not null,
+    activity text not null,
+    address text not null,
+    commune text not null,
+    country text not null
+);
+
 create index if not exists accounts_customer_idx on accounts (customer_id);
 create index if not exists cards_customer_idx on cards (customer_id);
 create index if not exists transactions_card_idx on transactions (card_id, transaction_at desc);
@@ -174,6 +185,7 @@ alter table cases enable row level security;
 alter table verification_sessions enable row level security;
 alter table verification_attempts enable row level security;
 alter table audit_log enable row level security;
+alter table registry_merchants enable row level security;
 
 -- The server-side key acts as the service_role database role.
 grant all on all tables in schema public to service_role;

@@ -11,7 +11,16 @@ from app import __version__, db
 from app.audit import audit_middleware
 from app.config import Settings, get_settings
 from app.errors import register_error_handlers
-from app.routers import accounts, cards, cases, customers, identity, insurance, signing
+from app.routers import (
+    accounts,
+    cards,
+    cases,
+    customers,
+    identity,
+    insurance,
+    registry,
+    signing,
+)
 from app.security import require_api_key
 
 
@@ -46,7 +55,7 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
     # Every business route is added to this router, so the API key check
     # applies to all of `/v1` without repeating it on each endpoint.
     v1 = APIRouter(prefix="/v1", dependencies=[Depends(require_api_key)])
-    for module in (identity, customers, accounts, cards, cases, insurance):
+    for module in (identity, customers, accounts, cards, cases, insurance, registry):
         v1.include_router(module.router)
     app.include_router(v1)
     # The signature page is public: the customer opens it from a link, without an API key.

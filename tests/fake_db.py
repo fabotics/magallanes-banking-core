@@ -10,6 +10,7 @@ import uuid
 from datetime import UTC, datetime
 
 from app.db import Row
+from seed.data import PRIMARY_KEYS
 
 
 class InMemoryRepository:
@@ -35,7 +36,7 @@ class InMemoryRepository:
         stored = []
         for row in rows:
             new_row = copy.deepcopy(row)
-            if table != "insurance_products":
+            if table not in PRIMARY_KEYS:
                 new_row.setdefault("id", str(uuid.uuid4()))
             if table == "cases" and "case_number" not in new_row:
                 self._case_sequence += 1
