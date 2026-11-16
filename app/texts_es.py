@@ -14,7 +14,7 @@ TEXTS = {
     "assistant_cta_hint": "Por voz o por chat, con el asistente virtual.",
     "assistant_title": "Asistente",
     "assistant_heading": "Hable con el banco",
-    "assistant_text": "Use el botón de conversación de abajo. Como ya ingresó con su PIN, el "
+    "assistant_text": "Inicie una llamada o un chat aquí abajo. Como ya ingresó con su PIN, el "
     "asistente sabe a qué app enviar la confirmación y no le pedirá su número de documento.",
     "assistant_live": "Lo que el asistente le envíe aparece aquí, sin salir de la conversación.",
     "assistant_off_title": "Asistente no disponible",

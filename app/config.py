@@ -29,7 +29,8 @@ class Settings(BaseSettings):
     # True once the contact center has a phone line a call can be transferred to.
     human_line_attached: bool = False
     # The embed snippet of the conversation widget shown in the app, from its provider.
-    # `{variables}` in it is replaced by the customer reference, as JSON. Empty: no widget.
+    # `{variables}` in it is replaced by the customer reference, as JSON, and `{lang}` by the
+    # language of the app. Empty: no widget.
     assistant_embed_html: str = ""
 
 
