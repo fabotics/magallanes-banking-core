@@ -12,6 +12,8 @@ from tests.conftest import API_KEY, MARTA, PIN_SECRET
 from tests.fake_db import InMemoryRepository
 
 PIN = app_pin(PIN_SECRET, "marta")
+MARTA_ID = seed_id("customer/marta")
+APP = f"/app?u={MARTA_ID}"
 SIGNATURE = {
     "initial_1": "yes", "initial_2": "yes", "initial_3": "yes", "initial_4": "yes",
     "signature_name": "Marta Rojas Fuentes", "accept": "yes",
@@ -20,7 +22,7 @@ SIGNATURE = {
 
 def sign_in(client: TestClient, language: str = "en") -> TestClient:
     client.get(f"/app?lang={language}")
-    client.post("/app/login", data={"pin": PIN})
+    client.post("/app/login", data={"u": MARTA_ID, "pin": PIN})
     return client
 
 
@@ -49,22 +51,25 @@ def test_both_languages_have_the_same_sentences_and_clauses() -> None:
 
 
 def test_spanish_is_the_default_and_the_link_can_ask_for_english(client: TestClient) -> None:
-    spanish = client.get("/app")
+    spanish = client.get(APP)
     assert '<html lang="es">' in spanish.text and "Hola, Marta" in spanish.text
     # The switch is on the PIN screen, with a link for each language.
-    assert "/app?lang=es" in spanish.text and "/app?lang=en" in spanish.text
-    english = client.get("/app?lang=en")
+    home = "&amp;next=%2Fapp%2Fhome"
+    assert f"{APP}{home}&amp;lang=es" in spanish.text
+    assert f"{APP}{home}&amp;lang=en" in spanish.text
+    english = client.get(f"{APP}&lang=en")
     assert '<html lang="en">' in english.text and "Hello, Marta" in english.text
     assert "Enter your four digit PIN" in english.text and "fictional bank" in english.text
 
 
 def test_the_choice_lasts_for_the_visit_and_can_be_changed_back(client: TestClient) -> None:
     client.get("/app?lang=en")
-    assert "Hello, Marta" in client.get("/app").text
-    assert "Hola, Marta" in client.get("/app?lang=es").text
-    assert "Hola, Marta" in client.get("/app").text
+    assert "Hello, Marta" in client.get(APP).text
+    assert "Sign in to your bank" in client.get("/app").text
+    assert "Hola, Marta" in client.get(f"{APP}&lang=es").text
+    assert "Hola, Marta" in client.get(APP).text
     # A language the pages do not exist in changes nothing.
-    assert "Hola, Marta" in client.get("/app?lang=fr").text
+    assert "Hola, Marta" in client.get(f"{APP}&lang=fr").text
 
 
 def test_the_switch_keeps_the_rest_of_the_link(client: TestClient) -> None:
@@ -76,12 +81,15 @@ def test_the_switch_keeps_the_rest_of_the_link(client: TestClient) -> None:
 def test_pin_errors_and_the_lock_message_in_english(client: TestClient) -> None:
     client.get("/app?lang=en")
     wrong = "0000" if PIN != "0000" else "1111"
-    first = client.post("/app/login", data={"pin": wrong})
+    first = client.post("/app/login", data={"u": MARTA_ID, "pin": wrong})
     assert first.status_code == 401 and "Wrong PIN" in first.text
     # The page answers a form, so its language links go back to the PIN screen.
     assert f"/app?u={seed_id('customer/marta')}&amp;next=%2Fapp%2Fhome&amp;lang=es" in first.text
-    client.post("/app/login", data={"pin": wrong})
-    locked = client.post("/app/login", data={"pin": wrong})
+    client.post("/app/login", data={"u": MARTA_ID, "pin": wrong})
+    locked = client.post("/app/login", data={"u": MARTA_ID, "pin": wrong})
+    form = client.post("/app/login", data={"document": "1-9", "pin": wrong})
+    assert "The ID number or the PIN is not right" in form.text
+    assert "/app?other=1&amp;next=%2Fapp%2Fhome&amp;lang=es" in form.text
     assert locked.status_code == 429 and "Too many attempts. Wait one minute" in locked.text
     assert client.get("/app?u=nobody").status_code == 404
     assert "App not available" in client.get("/app?u=nobody").text
@@ -90,7 +98,7 @@ def test_pin_errors_and_the_lock_message_in_english(client: TestClient) -> None:
 def test_a_language_in_a_deep_link_survives_the_pin_screen(client: TestClient) -> None:
     response = client.get("/app/home?lang=en", follow_redirects=False)
     assert response.status_code == 303 and "mg_lang=en" in response.headers["set-cookie"]
-    client.post("/app/login", data={"pin": PIN})
+    client.post("/app/login", data={"u": MARTA_ID, "pin": PIN})
     home = client.get("/app/home").text
     assert "You have no pending requests" in home and "Visa credit card ending in 4821" in home
     assert "Sign out" in home

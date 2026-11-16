@@ -51,4 +51,8 @@
   </div>
   {% endfor %}
   {% endif %}
+
+  <form method="post" action="/app/logout" class="leave">
+    <button type="submit" class="secondary">{{ t.log_out }}</button>
+  </form>
 {% endblock %}

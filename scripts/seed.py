@@ -3,7 +3,7 @@
 Usage:
     python scripts/seed.py            print the row count of every table
     python scripts/seed.py --reset    wipe every table, then load the seed rows
-    python scripts/seed.py --pins     print the app PIN of every seed customer
+    python scripts/seed.py --pins     print the ID number and app PIN of every seed customer
 
 A reset also clears verification attempts, sessions, pending confirmations
 and proposals, and restores every app PIN, so a locked test customer is
@@ -40,11 +40,11 @@ def print_counts(repository: Repository) -> None:
 
 
 def print_pins(pin_secret: str) -> None:
-    """Print the app PIN of every seed customer. They exist only if a secret is set."""
+    """Print each seed customer's ID number and app PIN. PINs exist only if a secret is set."""
     if not pin_secret:
         sys.exit("APP_PIN_SECRET is not set, so no customer has an app PIN.")
-    for person in PEOPLE:
-        print(f"{person[3]:14} {app_pin(pin_secret, person[0])}")
+    for key, _, document, first_name, *_ in PEOPLE:
+        print(f"{first_name:14} {document:20} {app_pin(pin_secret, key)}")
 
 
 def main() -> None:
