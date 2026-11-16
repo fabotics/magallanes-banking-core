@@ -26,7 +26,12 @@ def send_telegram(settings: Settings, chat_id: str, text: str) -> bool:
     try:
         response = httpx.post(
             TELEGRAM_URL.format(token=settings.telegram_bot_token),
-            json={"chat_id": chat_id, "text": text},
+            # Link previews are off: a preview would open the links in the message.
+            json={
+                "chat_id": chat_id,
+                "text": text,
+                "link_preview_options": {"is_disabled": True},
+            },
             timeout=10,
         )
         response.raise_for_status()

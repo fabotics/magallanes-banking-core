@@ -11,8 +11,9 @@ A language model follows a prompt most of the time. A bank needs rules that hold
 | Rule | How the API enforces it |
 | --- | --- |
 | Identity before data | Every customer endpoint needs a session token issued by identity verification. No token, HTTP 401 |
+| Identity is proven in the bank's app first | A confirmation request goes to the customer's app and expires in 90 seconds. Data said aloud on a call is the fallback, because someone else may know it too. The confirmation code is never returned by the API, so an agent cannot read it out |
 | Short sessions | A session lasts 15 minutes and belongs to one customer |
-| Limited attempts | Three failed verifications for a document within 15 minutes lock it |
+| Limited attempts | Three failed verifications for a document within 15 minutes lock it. Denied app confirmations and failed spoken checks count together |
 | Only reversible actions | The only state change on a card is a temporary block. No endpoint moves money |
 | Eligibility is the bank's decision | The API computes which insurance products may be offered, from country, segment, policies held and the vulnerable flag. An offer for anything else is refused |
 | Consent is recorded | Every offer and the customer's answer is stored. A sale is signed by the customer on a page, not by voice |
@@ -52,13 +53,14 @@ app/
   audit.py             audit middleware
   db.py                repository: every database call
   errors.py            one error shape: {"error", "message"}
+  confirmations.py     identity confirmation requests answered in the bank's app
   email.py             optional proposal email
-  messaging.py         optional call summary over Telegram
+  messaging.py         optional messages to the customer over Telegram
   mcp_server.py        MCP endpoint with the merchant lookup tool
   clock.py             one way to read and write timestamps
-  schemas.py, schemas_insurance.py, schemas_notifications.py
-  routers/             identity, customers, accounts, cards, cases, insurance, registry,
-                       notifications, signing
+  schemas.py, schemas_identity.py, schemas_insurance.py, schemas_notifications.py
+  routers/             identity, identity_push, customers, accounts, cards, cases, insurance,
+                       registry, notifications, signing
   templates/sign.html  signature page
 db/schema.sql          tables, checks, indexes, row level security
 seed/                  fictional customers and transactions, dated relative to today
@@ -81,7 +83,8 @@ tests/                 one file per area, plus the in-memory repository
 | `proposals` | Proposals sent, with their signing token and status |
 | `cases` | Fraud cases, handoffs, complaints and callbacks, numbered `MG-<year>-<sequence>` |
 | `verification_sessions` | Proof that identity was verified, with an expiry |
-| `verification_attempts` | Used by the lockout rule |
+| `verification_attempts` | Used by the lockout rule, for both identity paths |
+| `identity_confirmations` | Requests to confirm identity in the bank's app: code, status, expiry |
 | `audit_log` | One row per API call: endpoint, customer, conversation, outcome |
 | `registry_merchants` | Stand-in for the public company registry: the business behind a merchant tax ID |
 
@@ -94,7 +97,9 @@ Interactive documentation is served at `/docs`.
 | Method and path | Session | Purpose |
 | --- | --- | --- |
 | GET `/health` | no | Liveness and database status |
-| POST `/v1/identity/verify` | no | Verify the customer and open a session |
+| POST `/v1/identity/push` | no | Ask the customer to confirm their identity in the bank's app. Returns a `request_id`, pending for 90 seconds |
+| GET `/v1/identity/push/{request_id}` | no | pending, approved, denied or expired. Once approved it returns the session token |
+| POST `/v1/identity/verify` | no | Fallback: verify by document, card digits and birth year, and open a session |
 | GET `/v1/customers/me` | yes | First name, segment, language, products held |
 | GET `/v1/accounts/balance` | yes | Available balance per account |
 | GET `/v1/cards/transactions` | yes | Recent card movements, newest first. `days` (default 30), `status` (all, pending, posted) |
@@ -218,12 +223,13 @@ The API runs on Vercel as one Python function with no extra configuration: `app/
 Each endpoint maps to one webhook tool on any agent platform that can call HTTP APIs.
 
 - Store `BANK_API_KEY` as a secret on the platform and send it in `X-API-Key` on every tool.
-- After `verify identity`, keep `session_token` for the rest of the conversation and send it in `X-Session-Token`.
+- Verify identity in the app first: call `identity/push` with the document number the customer says, keep `request_id`, tell the customer to approve the request in the app, and read the result when they say they did. Read it at most a few times; if it stays pending, or comes back denied or expired, fall back to `identity/verify`. `push` answers the same for a document the bank does not know, so the agent learns nothing from it.
+- After either path, keep `session_token` for the rest of the conversation and send it in `X-Session-Token`.
 - Pass the platform's conversation ID as `conversation_id` when verifying. The API then ties every later call, case and offer to that conversation.
 - Keep `offer_id` from `offers` to request the proposal, and read `case_number` and block `reference` back to the customer.
 - `transactions` waits about one second before answering, like a legacy system would. Have the agent say something while it waits.
 - At the end of the conversation, send a short `call summary`. The API delivers it to the channel the bank has on file and answers `sent: false` when there is none.
-- When `eligibility` answers `eligible: false`, the agent makes no offer. When `verify` answers `locked: true`, the agent opens a handoff case.
+- When `eligibility` answers `eligible: false`, the agent makes no offer. When `verify` answers `locked: true` or `push` answers `status: locked`, the agent opens a handoff case.
 - A handoff for a caller who is not verified has no session token to send. If your platform refuses a tool call when a header variable is empty, give that handoff its own tool without the `X-Session-Token` header.
 
 ### Merchant lookup over MCP

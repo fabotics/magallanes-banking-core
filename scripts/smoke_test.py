@@ -38,7 +38,7 @@ class Smoke:
         """Run one request, print its status, and return the JSON body if there is one."""
         response = self.client.request(method, path, **kwargs)
         verdict = "ok" if response.status_code == expected else f"FAIL, expected {expected}"
-        print(f"{name:34} {method:4} {path:36} {response.status_code}  {verdict}")
+        print(f"{name:34} {method:4} {path:36.36} {response.status_code}  {verdict}")
         if response.status_code != expected:
             self.failures += 1
         is_json = response.headers.get("content-type", "").startswith("application/json")
@@ -49,6 +49,14 @@ def run(smoke: Smoke) -> None:
     """The golden path: verify, read, check eligibility, record an offer, send details."""
     smoke.step("health", 200, "GET", "/health")
     smoke.step("no session is refused", 401, "GET", "/v1/accounts/balance")
+    pushed = smoke.step(
+        "confirmation request to the app", 200, "POST", "/v1/identity/push",
+        json={"customer_id": DEMO_CUSTOMER["document_number"], "conversation_id": CONVERSATION},
+    )  # fmt: skip
+    waiting = smoke.step(
+        "confirmation is pending", 200, "GET", f"/v1/identity/push/{pushed.get('request_id')}"
+    )
+    print(f"{'':34} status: {waiting.get('status')}")
     verified = smoke.step(
         "verify identity", 200, "POST", "/v1/identity/verify",
         json={**DEMO_CUSTOMER, "conversation_id": CONVERSATION},

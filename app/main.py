@@ -17,6 +17,7 @@ from app.routers import (
     cases,
     customers,
     identity,
+    identity_push,
     insurance,
     notifications,
     registry,
@@ -56,7 +57,17 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
     # Every business route is added to this router, so the API key check
     # applies to all of `/v1` without repeating it on each endpoint.
     v1 = APIRouter(prefix="/v1", dependencies=[Depends(require_api_key)])
-    routers = (identity, customers, accounts, cards, cases, insurance, registry, notifications)
+    routers = (
+        identity,
+        identity_push,
+        customers,
+        accounts,
+        cards,
+        cases,
+        insurance,
+        registry,
+        notifications,
+    )
     for module in routers:
         v1.include_router(module.router)
     app.include_router(v1)

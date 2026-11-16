@@ -50,6 +50,24 @@ def find_customer(repository: Repository, document: str, body: VerifyRequest) ->
     return customer if card_matches and year_matches else None
 
 
+def open_session(
+    repository: Repository, customer: Row, conversation_id: str | None, now: datetime
+) -> str:
+    """Open a 15 minute session for a verified customer and return its token."""
+    token = secrets.token_urlsafe(32)
+    repository.insert(
+        "verification_sessions",
+        {
+            "token": token,
+            "customer_id": customer["id"],
+            "conversation_id": conversation_id,
+            "created_at": now.isoformat(),
+            "expires_at": (now + SESSION_LIFETIME).isoformat(),
+        },
+    )
+    return token
+
+
 @router.post("/identity/verify", response_model=VerifyResponse, response_model_exclude_none=True)
 def verify_identity(
     body: VerifyRequest,
@@ -84,16 +102,6 @@ def verify_identity(
             verified=False, locked=locked, attempts_remaining=MAX_FAILED_ATTEMPTS - failures
         )
 
-    token = secrets.token_urlsafe(32)
-    repository.insert(
-        "verification_sessions",
-        {
-            "token": token,
-            "customer_id": customer["id"],
-            "conversation_id": body.conversation_id,
-            "created_at": now.isoformat(),
-            "expires_at": (now + SESSION_LIFETIME).isoformat(),
-        },
-    )
+    token = open_session(repository, customer, body.conversation_id, now)
     audit.note(request, customer_id=customer["id"], outcome="verified")
     return VerifyResponse(verified=True, session_token=token, first_name=customer["first_name"])
