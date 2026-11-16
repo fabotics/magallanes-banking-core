@@ -62,3 +62,15 @@ class ProposalResponse(BaseModel):
     signing_url: str | None = None
     sent_to: str = Field(description="Masked address, safe to read aloud.")
     email_sent: bool = Field(description="False when the API is not configured to send email.")
+    message_sent: bool = Field(
+        default=False, description="True when the signing link also went to the messaging channel."
+    )
+
+
+class ProposalStatusResponse(BaseModel):
+    """Where a proposal stands. The policy fields are present only once it is signed."""
+
+    proposal_number: str
+    status: Literal["pending", "signed", "expired"]
+    policy_number: str | None = None
+    start_date: str | None = Field(default=None, description="ISO date the cover starts.")

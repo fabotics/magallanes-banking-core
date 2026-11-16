@@ -76,6 +76,8 @@ create table if not exists policies (
     id uuid primary key default gen_random_uuid(),
     customer_id uuid not null references customers (id),
     product_code text not null references insurance_products (code),
+    policy_number text unique,
+    proposal_id uuid,
     status text not null default 'active' check (status in ('active', 'cancelled')),
     started_at timestamptz not null default now()
 );
@@ -101,8 +103,21 @@ create table if not exists proposals (
     status text not null default 'sent' check (status in ('sent', 'signed', 'expired')),
     sent_to text not null,
     created_at timestamptz not null default now(),
+    viewed_at timestamptz,
     signed_at timestamptz
 );
+
+-- Columns added after the first release. A database created by an earlier
+-- version of this file gets them here; on a new database these lines do nothing.
+alter table policies add column if not exists policy_number text unique;
+alter table policies add column if not exists proposal_id uuid;
+alter table proposals add column if not exists viewed_at timestamptz;
+
+-- A policy points back to the proposal the customer signed. Added here because
+-- `policies` is created before `proposals`.
+alter table policies drop constraint if exists policies_proposal_fk;
+alter table policies add constraint policies_proposal_fk
+    foreign key (proposal_id) references proposals (id);
 
 -- Case numbers look like MG-2026-000001: prefix, year, then this sequence.
 create sequence if not exists case_number_seq;
