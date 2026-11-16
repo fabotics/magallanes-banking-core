@@ -1,68 +1,75 @@
-"""The wording of each insurance contract, and the checks on the customer's signature.
+"""The contract a customer signs: built per product and language, with a fingerprint.
 
-The catalog row carries the name, the premium and a one line summary. The
-clauses a customer signs are longer, so they live here, one list per product.
-A product without its own clauses falls back to the catalog summary.
+`build` returns everything the contract page shows, as plain data. The page
+renders it, and `fingerprint` hashes it, so the hash stored with the signature
+is the hash of exactly the wording, in exactly the language, that was shown.
+The wording itself is in `contract_es.py` and `contract_en.py`.
 """
 
+import hashlib
+import json
 import unicodedata
+from datetime import date
 
+from app import contract_en, contract_es
 from app.db import Row
+from app.formatting import card_label, document, long_date, money
 
+CONTRACT = {"es": contract_es.TEXT, "en": contract_en.TEXT}
 INSURER = "Magallanes Seguros Generales S.A."
 PAGES = 4
 
-COVER = {
-    "CARD_FRAUD": [
-        "Cargos no autorizados: se reembolsan los cargos hechos con la tarjeta sin el "
-        "consentimiento del asegurado, por robo, hurto, extravío, clonación o uso fraudulento "
-        "de sus datos, en comercios presenciales o electrónicos.",
-        "Reposición de la tarjeta: se cubre el costo de emitir y despachar la tarjeta de "
-        "reemplazo.",
-        "Límite: hasta $3.000.000 por evento, con un máximo de dos eventos por año de vigencia.",
-        "Aviso: el asegurado debe avisar al banco dentro de los 30 días siguientes a la fecha "
-        "del cargo que desconoce.",
-    ],
-    "UNEMPLOYMENT": [
-        "Cesantía involuntaria: se paga el pago mínimo de la tarjeta por hasta seis meses "
-        "mientras el asegurado esté sin empleo.",
-        "Carencia: la cobertura comienza 60 días después de la firma.",
-    ],
-    "PURCHASE": [
-        "Robo o daño accidental de las compras hechas con la tarjeta, durante 90 días desde "
-        "la fecha de compra.",
-        "Límite: hasta el valor de compra del bien, con un máximo de $1.000.000 por año.",
-    ],
-}
 
-EXCLUSIONS = {
-    "CARD_FRAUD": [
-        "Cargos hechos por el asegurado, o por una persona a quien entregó voluntariamente "
-        "su tarjeta o sus claves.",
-        "Cargos anteriores a la fecha de inicio de la vigencia.",
-        "Hechos causados con dolo o culpa grave del asegurado.",
-        "Pérdidas indirectas, intereses y lucro cesante.",
-    ],
-    "UNEMPLOYMENT": [
-        "Renuncia voluntaria y término de un contrato a plazo fijo en la fecha pactada.",
-        "Trabajadores independientes y personas sin contrato de trabajo.",
-        "Despidos notificados antes de la fecha de inicio de la vigencia.",
-    ],
-    "PURCHASE": [
-        "Desgaste por uso normal y defectos de fabricación.",
-        "Extravío del bien sin que exista robo.",
-        "Vehículos motorizados, dinero, joyas y animales.",
-    ],
-}
+def product_wording(product: Row, language: str) -> tuple[str, str]:
+    """Return the product's name and one line of cover in this language.
 
-GENERAL_EXCLUSION = "Hechos ocurridos fuera de la vigencia de la póliza."
+    The catalog is in Spanish. Other languages come from the contract texts,
+    and fall back to the catalog for a product that has no translation.
+    """
+    translated = CONTRACT[language]["products"].get(product["code"])
+    if language == "es" or translated is None:
+        return product["name"], product["coverage_summary"]
+    return translated
 
 
-def clauses(product: Row) -> tuple[list[str], list[str]]:
-    """Return the cover clauses and the exclusions for a product."""
-    cover = COVER.get(product["code"], [product["coverage_summary"]])
-    exclusions = EXCLUSIONS.get(product["code"], [])
-    return cover, [*exclusions, GENERAL_EXCLUSION]
+def build(
+    language: str, proposal: Row, product: Row, customer: Row, card: Row | None, issued: date
+) -> dict:
+    """Assemble the four pages for one proposal, in one language."""
+    words = CONTRACT[language]
+    name, summary = product_wording(product, language)
+    premium = money(product["monthly_premium"], product["currency"], language)
+    paid_with = card_label(card, language) if card else words["any_card"]
+    values = [
+        proposal["proposal_number"], long_date(issued, language), INSURER, "Banco Magallanes",
+        f"{customer['first_name']} {customer['last_name']}",
+        document(customer["document_type"], customer["document_number"]), name, premium,
+        paid_with, words["term"],
+    ]  # fmt: skip
+    labels = list(words["labels"])
+    labels[5] = customer["document_type"]
+    cover = words["cover"].get(product["code"], [summary])
+    exclusions = [*words["exclusions"].get(product["code"], []), words["general_exclusion"]]
+    general = [
+        (heading, text.format(premium=premium, card=paid_with))
+        for heading, text in words["general"]
+    ]
+    return {
+        "language": language,
+        "titles": words["titles"],
+        "product_name": name,
+        "premium": premium,
+        "particulars": list(zip(labels, values, strict=True)),
+        "cover": cover,
+        "exclusions": exclusions,
+        "general": general,
+    }
+
+
+def fingerprint(contract: dict) -> str:
+    """Return the SHA-256 of the contract's content: same wording, same hash."""
+    canonical = json.dumps(contract, sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(canonical.encode()).hexdigest()
 
 
 def initials(customer: Row) -> str:

@@ -10,30 +10,29 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
 
-from app import app_session, audit, confirmations, signature
+from app import app_session, audit, confirmations, contracts, i18n, signature
 from app.clock import bank_date, parse_time, utc_now
 from app.db import Repository, Row, get_repository
 from app.formatting import card_label, long_date, money
 
 router = APIRouter(tags=["app"], include_in_schema=False)
 CONFIRMATION_ENDPOINT = "/app/confirmations/{request_id}"
-GONE = {"title": "No disponible", "text": "Esta solicitud no existe o ya no está vigente."}
+GONE = ("gone_title", "request_gone")
+# Result of a request: title and text (keys of the text tables) and the tone of the message.
 ANSWERS = {
-    "approved": ("Identidad confirmada", "Gracias. Ya puede volver a la llamada.", "ok"),
-    "denied": ("Solicitud rechazada", "No se compartió ningún dato. Si no reconoce la llamada, "
-               "cuelgue y llame al número que está en su tarjeta.", "error"),
-    "expired": ("Solicitud vencida", "Pasaron más de 90 segundos. Pida una nueva en la llamada.",
-                "muted"),
-}  # fmt: skip
+    "approved": ("approved_title", "approved_text", "ok"),
+    "denied": ("denied_title", "denied_text", "error"),
+    "expired": ("expired_title", "expired_text", "muted"),
+}
 
 
-def named(repository: Repository, rows: list[Row]) -> list[Row]:
+def named(repository: Repository, rows: list[Row], language: str) -> list[Row]:
     """Add the product name and the formatted premium to proposal or policy rows."""
     catalog = {row["code"]: row for row in repository.select("insurance_products")}
     for row in rows:
         product = catalog[row["product_code"]]
-        row["product_name"] = product["name"]
-        row["premium"] = money(product["monthly_premium"], product["currency"])
+        row["product_name"] = contracts.product_wording(product, language)[0]
+        row["premium"] = money(product["monthly_premium"], product["currency"], language)
     return rows
 
 
@@ -44,14 +43,15 @@ def home(request: Request, repository: Annotated[Repository, Depends(get_reposit
     if customer is None:
         return app_session.to_login(request)
     now = utc_now()
+    language = i18n.pick_language(request)
     owned = {"customer_id": customer["id"]}
     waiting = repository.select(confirmations.TABLE, {**owned, "status": "pending"})
     proposals = repository.select("proposals", {**owned, "status": "sent"})
     policies = repository.select("policies", {**owned, "status": "active"})
     for policy in policies:
-        policy["start"] = long_date(bank_date(parse_time(policy["started_at"])))
+        policy["start"] = long_date(bank_date(parse_time(policy["started_at"])), language)
     cards = repository.select("cards", owned)
-    label = card_label(cards[0]) if cards else ""
+    label = card_label(cards[0], language) if cards else ""
     context = {
         "signed_in": True,
         "customer": customer,
@@ -64,8 +64,9 @@ def home(request: Request, repository: Annotated[Repository, Depends(get_reposit
                 for p in proposals
                 if p["signing_token"] and signature.proposal_status(p, now) == "pending"
             ],
-        ),  # fmt: skip
-        "policies": named(repository, policies),
+            language,
+        ),
+        "policies": named(repository, policies, language),
     }
     return app_session.page(request, "home", context)
 
@@ -89,7 +90,7 @@ def show_confirmation(
         return app_session.to_login(request)
     confirmation = find_confirmation(repository, customer, request_id)
     if confirmation is None:
-        return app_session.message(request, **GONE)
+        return app_session.message(request, *GONE)
     status = confirmations.current_status(confirmation, utc_now())
     if status != "pending":
         return app_session.message(request, *ANSWERS[status])
@@ -109,7 +110,7 @@ def answer_confirmation(
         return app_session.to_login(request)
     confirmation = find_confirmation(repository, customer, request_id)
     if confirmation is None:
-        return app_session.message(request, **GONE)
+        return app_session.message(request, *GONE)
     now = utc_now()
     if confirmations.current_status(confirmation, now) == "pending":
         approved = fields.get("decision") == "approve"

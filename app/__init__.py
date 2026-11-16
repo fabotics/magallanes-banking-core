@@ -1,3 +1,3 @@
 """Banco Magallanes mock banking core: an API meant to be called by conversational agents."""
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"

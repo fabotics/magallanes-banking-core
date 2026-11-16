@@ -9,5 +9,5 @@
   </dl>
   {% endif %}
   {% if note %}<p class="muted small">{{ note }}</p>{% endif %}
-  {% if signed_in %}<p><a class="button secondary" href="/app/home">Volver al inicio</a></p>{% endif %}
+  {% if signed_in %}<p><a class="button secondary" href="/app/home">{{ t.back_home }}</a></p>{% endif %}
 {% endblock %}

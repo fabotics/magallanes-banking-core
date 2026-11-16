@@ -1,13 +1,13 @@
 {% extends "app/base.html" %}
-{% block title %}Confirmar identidad{% endblock %}
+{% block title %}{{ t.confirm_title }}{% endblock %}
 {% block content %}
-  <h1>¿Es usted?</h1>
-  <p>Alguien en una llamada con el banco pide confirmar que es usted.</p>
-  <p class="muted small">Este código debe ser el mismo que recibió en su mensajería. No se lo diga a nadie, tampoco a quien le habla por teléfono.</p>
-  <div class="code" aria-label="Código de la solicitud">{{ confirmation.code }}</div>
+  <h1>{{ t.confirm_heading }}</h1>
+  <p>{{ t.confirm_text }}</p>
+  <p class="muted small">{{ t.confirm_code_hint }}</p>
+  <div class="code" aria-label="{{ t.confirm_code_label }}">{{ confirmation.code }}</div>
   <form method="post">
-    <button type="submit" name="decision" value="approve">Sí, soy yo. Aprobar</button>
-    <button type="submit" name="decision" value="deny" class="secondary">No soy yo. Rechazar</button>
+    <button type="submit" name="decision" value="approve">{{ t.approve }}</button>
+    <button type="submit" name="decision" value="deny" class="secondary">{{ t.deny }}</button>
   </form>
-  <p class="muted small">Si usted no está en una llamada con el banco, rechace la solicitud. Vence a los 90 segundos.</p>
+  <p class="muted small">{{ t.confirm_footnote }}</p>
 {% endblock %}
