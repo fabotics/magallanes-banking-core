@@ -28,12 +28,18 @@
     <p>Hola {{ customer.first_name }}, esta es la propuesta que conversamos.</p>
     <dl>
       <dt>Producto</dt><dd>{{ product.name }}</dd>
-      <dt>Prima mensual</dt><dd>{{ product.monthly_premium }} {{ product.currency }}</dd>
+      <dt>Prima mensual</dt><dd>{{ premium }}</dd>
       <dt>Cobertura</dt><dd>{{ product.coverage_summary }}</dd>
     </dl>
-    {% if proposal.status == "signed" %}
+    {% if status == "signed" %}
       <p class="ok">Propuesta firmada. Tu seguro ya está activo.</p>
-    {% elif proposal.status == "sent" %}
+      {% if policy %}
+      <dl>
+        <dt>Póliza</dt><dd>{{ policy.policy_number }}</dd>
+        <dt>Vigente desde</dt><dd>{{ start }}</dd>
+      </dl>
+      {% endif %}
+    {% elif status == "pending" and proposal.signing_token %}
       <form method="post">
         <button type="submit">Firmar propuesta</button>
       </form>

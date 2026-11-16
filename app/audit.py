@@ -1,7 +1,8 @@
 """Audit trail: one `audit_log` row for every `/v1` and `/mcp` call.
 
 Endpoints describe what happened with `note(...)`. The middleware writes the
-row after the response is ready. Secrets, session tokens and full document
+row after the response is ready. The customer pages are outside `/v1`, so they
+write their own rows with `record(...)`. Secrets, session tokens and full document
 numbers are never passed to `note`, and the query string is never recorded.
 """
 
@@ -41,6 +42,29 @@ def note(
     if outcome:
         audit["outcome"] = outcome
     audit["detail"].update(detail)
+
+
+def record(
+    repository: db.Repository,
+    endpoint: str,
+    method: str,
+    customer_id: str | None,
+    outcome: str,
+    **detail: Any,
+) -> None:
+    """Write one audit row directly, for the customer pages that are outside `/v1`."""
+    repository.insert(
+        "audit_log",
+        {
+            "at": utc_now().isoformat(),
+            "endpoint": endpoint,
+            "method": method,
+            "customer_id": customer_id,
+            "conversation_id": None,
+            "outcome": outcome,
+            "detail": detail,
+        },
+    )
 
 
 def mask(value: str) -> str:

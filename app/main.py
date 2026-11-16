@@ -20,6 +20,7 @@ from app.routers import (
     identity_push,
     insurance,
     notifications,
+    proposals,
     registry,
     signing,
 )
@@ -65,6 +66,7 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
         cards,
         cases,
         insurance,
+        proposals,
         registry,
         notifications,
     )
