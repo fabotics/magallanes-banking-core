@@ -17,6 +17,7 @@ A language model follows a prompt most of the time. A bank needs rules that hold
 | Only reversible actions | The only state change on a card is a temporary block. No endpoint moves money |
 | Eligibility is the bank's decision | The API computes which insurance products may be offered, from country, segment, policies held and the vulnerable flag. An offer for anything else is refused |
 | Consent is recorded | Every offer and the customer's answer is stored. A sale is signed by the customer on a page, not by voice |
+| A sale is real only when signed | The proposal reaches the customer at once, by email and in their chat, so they can sign during the call. The agent can read whether it was signed, with the policy number and start date, and can never sign for them. Sent, viewed and signed each leave an audit row |
 | Never a dead end | A handoff case can be opened without a verified session, with no customer data attached |
 | Everything is recorded | Every `/v1` and `/mcp` call writes an audit row. Tokens and full document numbers are never logged |
 | Only known callers | Every `/v1` and `/mcp` call needs the API key |
@@ -54,13 +55,15 @@ app/
   db.py                repository: every database call
   errors.py            one error shape: {"error", "message"}
   confirmations.py     identity confirmation requests answered in the bank's app
-  email.py             optional proposal email
+  email.py             optional emails: the proposal, the policy confirmation
+  signature.py         what happens when a proposal is seen and signed
+  formatting.py        amounts and dates as the customer reads them
   messaging.py         optional messages to the customer over Telegram
   mcp_server.py        MCP endpoint with the merchant lookup tool
   clock.py             one way to read and write timestamps
   schemas.py, schemas_identity.py, schemas_insurance.py, schemas_notifications.py
   routers/             identity, identity_push, customers, accounts, cards, cases, insurance,
-                       registry, notifications, signing
+                       proposals, registry, notifications, signing
   templates/sign.html  signature page
 db/schema.sql          tables, checks, indexes, row level security
 seed/                  fictional customers and transactions, dated relative to today
@@ -78,9 +81,9 @@ tests/                 one file per area, plus the in-memory repository
 | `cards` | Cards and their status: active, blocked_temporary, blocked |
 | `transactions` | Card movements as on a statement: a cryptic descriptor, sometimes a merchant tax ID, never a merchant name |
 | `insurance_products` | The catalog, with the segments each product is open to |
-| `policies` | Who already holds which product |
+| `policies` | Who holds which product, with the policy number and the proposal that was signed |
 | `insurance_offers` | Every offer made and the customer's answer. The consent record |
-| `proposals` | Proposals sent, with their signing token and status |
+| `proposals` | Proposals sent, with their signing token, status, and when they were viewed and signed |
 | `cases` | Fraud cases, handoffs, complaints and callbacks, numbered `MG-<year>-<sequence>` |
 | `verification_sessions` | Proof that identity was verified, with an expiry |
 | `verification_attempts` | Used by the lockout rule, for both identity paths |
@@ -107,10 +110,11 @@ Interactive documentation is served at `/docs`.
 | POST `/v1/cases` | handoff: optional | Fraud case, handoff, complaint or callback. Returns a case number |
 | GET `/v1/insurance/eligibility` | yes | Products the bank pre-approves, or the reason there are none |
 | POST `/v1/insurance/offers` | yes | Record an offer and the answer: accepted, declined, info_requested |
-| POST `/v1/insurance/proposals` | yes | Create the proposal for an offer. Accepted offers get a signing link |
+| POST `/v1/insurance/proposals` | yes | Create the proposal for an offer and send it by email and to the customer's chat. Accepted offers get a signing link |
+| GET `/v1/insurance/proposals/{proposal_number}` | yes | pending, signed or expired. Once signed: the policy number and the start date |
 | POST `/v1/notifications/call-summary` | yes | Send a written summary of the call to the customer's messaging channel (Telegram) |
 | GET `/v1/registry/merchants/{tax_id}` | no | The business behind a merchant tax ID |
-| GET, POST `/sign/{token}` | no | Signature page. Signing creates the policy |
+| GET, POST `/sign/{token}` | no | Signature page. Signing creates the policy and sends the customer a confirmation |
 | POST `/mcp` | no | MCP server with one tool, `lookup_merchant`. Same key, in `X-API-Key` or as a bearer token |
 
 The session token goes in the `X-Session-Token` header (preferred). It is also accepted as a `session_token` query parameter on GET and as a `session_token` body field on POST.
@@ -161,7 +165,7 @@ python scripts/seed.py --reset
 uvicorn app.main:app --reload
 ```
 
-`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the demo customer gets them, so proposals and call summaries reach you. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, which unlocks a locked customer.
+`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the demo customer gets them, so proposals, confirmations and call summaries reach you. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, which unlocks a locked customer.
 
 ### Seed customers
 
@@ -227,6 +231,7 @@ Each endpoint maps to one webhook tool on any agent platform that can call HTTP 
 - After either path, keep `session_token` for the rest of the conversation and send it in `X-Session-Token`.
 - Pass the platform's conversation ID as `conversation_id` when verifying. The API then ties every later call, case and offer to that conversation.
 - Keep `offer_id` from `offers` to request the proposal, and read `case_number` and block `reference` back to the customer.
+- After `proposals`, tell the customer where the link is and that nothing is active until they sign. If they sign while still on the call, read the proposal status once and confirm the policy number and start date. The catalog is written in the customers' language, so the agent says names, cover and prices as they come.
 - `transactions` waits about one second before answering, like a legacy system would. Have the agent say something while it waits.
 - At the end of the conversation, send a short `call summary`. The API delivers it to the channel the bank has on file and answers `sent: false` when there is none.
 - When `eligibility` answers `eligible: false`, the agent makes no offer. When `verify` answers `locked: true` or `push` answers `status: locked`, the agent opens a handoff case.
@@ -254,7 +259,6 @@ python scripts/mcp_check.py --base-url http://localhost:8000
 ## Roadmap
 
 - CRM sync for cases and opportunities.
-- Proposal expiry.
 
 ## License
 

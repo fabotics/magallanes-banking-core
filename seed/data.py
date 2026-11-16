@@ -19,9 +19,9 @@ TABLES = [
     "accounts",
     "cards",
     "transactions",
-    "policies",
     "insurance_offers",
     "proposals",
+    "policies",
     "cases",
     "verification_sessions",
     "verification_attempts",
@@ -35,31 +35,37 @@ PRIMARY_KEYS = {"insurance_products": "code", "registry_merchants": "tax_id"}
 
 FRAUD_PRODUCT = "CARD_FRAUD"
 
+# Names and coverage are in the customers' language: the agent, the proposal and the
+# policy all use these exact words, so nothing the customer hears is a translation.
+
 PRODUCTS = [
     {
         "code": FRAUD_PRODUCT,
-        "name": "Card fraud protection",
+        "name": "Protección contra fraude de tarjeta",
         "monthly_premium": 2990,
         "currency": "CLP",
-        "coverage_summary": "Refunds unauthorized card charges and covers card replacement.",
+        "coverage_summary": "Devuelve los cargos no autorizados hechos con la tarjeta y cubre "
+        "la reposición de la tarjeta.",
         "eligible_segments": ["mass", "preferred", "premium"],
         "active": True,
     },
     {
         "code": "UNEMPLOYMENT",
-        "name": "Unemployment protection",
+        "name": "Protección de cesantía",
         "monthly_premium": 5490,
         "currency": "CLP",
-        "coverage_summary": "Pays the card's minimum payment for up to six months of job loss.",
+        "coverage_summary": "Paga el pago mínimo de la tarjeta hasta por seis meses en caso de "
+        "pérdida del empleo.",
         "eligible_segments": ["preferred", "premium"],
         "active": True,
     },
     {
         "code": "PURCHASE",
-        "name": "Purchase protection",
+        "name": "Protección de compras",
         "monthly_premium": 3990,
         "currency": "CLP",
-        "coverage_summary": "Covers theft or accidental damage of card purchases for 90 days.",
+        "coverage_summary": "Cubre robo o daño accidental de las compras hechas con la tarjeta "
+        "durante 90 días.",
         "eligible_segments": ["premium"],
         "active": True,
     },
@@ -87,6 +93,8 @@ def build_seed(
             "id": seed_id("policy/carolina/fraud"),
             "customer_id": seed_id("customer/carolina"),
             "product_code": FRAUD_PRODUCT,
+            "policy_number": "PZ-SEED-000001",
+            "proposal_id": None,
             "status": "active",
             "started_at": at(today - timedelta(days=200), 12, 0),
         }

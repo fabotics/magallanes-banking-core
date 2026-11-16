@@ -5,7 +5,8 @@ Usage:
 
 Reads BANK_API_KEY from the environment or `.env`. It uses the seeded demo
 customer and exits with code 1 if any step answers with an unexpected status.
-It writes a few rows (an offer, a proposal, a case, audit rows) and blocks no card.
+It writes a few rows (a confirmation request, an offer, a proposal, a case, audit rows),
+sends the demo customer the matching messages, signs nothing and blocks no card.
 The last step connects to `/mcp` with the MCP SDK client and calls the lookup tool.
 """
 
@@ -69,13 +70,19 @@ def run(smoke: Smoke) -> None:
     smoke.step("merchant behind a tax ID", 200, "GET", "/v1/registry/merchants/66871234-7")
     smoke.step("eligibility", 200, "GET", "/v1/insurance/eligibility", headers=session)
     offer = smoke.step(
-        "offer: asked for details", 200, "POST", "/v1/insurance/offers", headers=session,
-        json={"product_code": "CARD_FRAUD", "customer_response": "info_requested"},
+        "offer: accepted", 200, "POST", "/v1/insurance/offers", headers=session,
+        json={"product_code": "CARD_FRAUD", "customer_response": "accepted"},
     )  # fmt: skip
-    smoke.step(
-        "proposal with details", 200, "POST", "/v1/insurance/proposals", headers=session,
+    proposal = smoke.step(
+        "proposal with a signing link", 200, "POST", "/v1/insurance/proposals", headers=session,
         json={"offer_id": offer.get("offer_id", "")},
     )  # fmt: skip
+    print(f"{'':34} email: {proposal.get('email_sent')}, chat: {proposal.get('message_sent')}")
+    signed = smoke.step(
+        "proposal is not signed yet", 200, "GET",
+        f"/v1/insurance/proposals/{proposal.get('proposal_number')}", headers=session,
+    )  # fmt: skip
+    print(f"{'':34} status: {signed.get('status')}")
     smoke.step(
         "handoff without a session", 200, "POST", "/v1/cases",
         json={"type": "handoff", "summary": "Smoke test", "conversation_id": CONVERSATION},

@@ -36,10 +36,11 @@ def test_eligible_customer_gets_a_choice_of_products(client: TestClient, marta: 
     assert [product["code"] for product in body["products"]] == ["CARD_FRAUD", "UNEMPLOYMENT"]
     assert body["products"][0] == {
         "code": "CARD_FRAUD",
-        "name": "Card fraud protection",
+        "name": "Protección contra fraude de tarjeta",
         "monthly_premium": 2990,
         "currency": "CLP",
-        "coverage_summary": "Refunds unauthorized card charges and covers card replacement.",
+        "coverage_summary": "Devuelve los cargos no autorizados hechos con la tarjeta y cubre "
+        "la reposición de la tarjeta.",
     }
 
 
@@ -153,7 +154,7 @@ def test_signing_the_proposal_creates_the_policy(
 
     page = client.get(path)
     assert page.status_code == 200 and "Firmar propuesta" in page.text
-    assert "Card fraud protection" in page.text and "Marta" in page.text
+    assert "Protección contra fraude de tarjeta" in page.text and "Marta" in page.text
 
     signed = client.post(path)
     assert signed.status_code == 200 and "Propuesta firmada" in signed.text
