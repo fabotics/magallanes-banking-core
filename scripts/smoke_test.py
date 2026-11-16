@@ -72,6 +72,11 @@ def run(smoke: Smoke) -> None:
         "handoff without a session", 200, "POST", "/v1/cases",
         json={"type": "handoff", "summary": "Smoke test", "conversation_id": CONVERSATION},
     )  # fmt: skip
+    summary = smoke.step(
+        "call summary to messaging", 200, "POST", "/v1/notifications/call-summary",
+        headers=session, json={"summary": "Smoke test: the call summary channel works."},
+    )  # fmt: skip
+    print(f"{'':34} sent: {summary.get('sent')}, channel: {summary.get('channel')}")
     smoke.step("unknown signing link", 404, "GET", "/sign/not-a-real-token")
 
 

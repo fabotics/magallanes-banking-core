@@ -20,11 +20,12 @@ from app.db import Repository, build_repository  # noqa: E402
 from seed.data import PRIMARY_KEYS, TABLES, build_seed  # noqa: E402
 
 
-def reset(repository: Repository, demo_email: str) -> None:
+def reset(repository: Repository, demo_email: str, demo_chat_id: str) -> None:
     """Delete all rows, children first, then insert the seed rows, parents first."""
     for table in reversed(TABLES):
         repository.delete_all(table, PRIMARY_KEYS.get(table, "id"))
-    for table, rows in build_seed(demo_email=demo_email).items():
+    seed = build_seed(demo_email=demo_email, demo_chat_id=demo_chat_id)
+    for table, rows in seed.items():
         repository.insert_many(table, rows)
 
 
@@ -43,7 +44,7 @@ def main() -> None:
     settings = get_settings()
     repository = build_repository(settings)
     if args.reset:
-        reset(repository, settings.demo_customer_email)
+        reset(repository, settings.demo_customer_email, settings.demo_telegram_chat_id)
         print("Reset done.")
     print_counts(repository)
 
