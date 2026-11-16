@@ -17,8 +17,8 @@ A language model follows a prompt most of the time. A bank needs rules that hold
 | Eligibility is the bank's decision | The API computes which insurance products may be offered, from country, segment, policies held and the vulnerable flag. An offer for anything else is refused |
 | Consent is recorded | Every offer and the customer's answer is stored. A sale is signed by the customer on a page, not by voice |
 | Never a dead end | A handoff case can be opened without a verified session, with no customer data attached |
-| Everything is recorded | Every `/v1` call writes an audit row. Tokens and full document numbers are never logged |
-| Only known callers | Every `/v1` call needs the `X-API-Key` header |
+| Everything is recorded | Every `/v1` and `/mcp` call writes an audit row. Tokens and full document numbers are never logged |
+| Only known callers | Every `/v1` and `/mcp` call needs the API key |
 
 ## Architecture
 
@@ -55,7 +55,8 @@ app/
   email.py             optional proposal email
   messaging.py         optional call summary over Telegram
   mcp_server.py        MCP endpoint with the merchant lookup tool
-  schemas.py, schemas_insurance.py
+  clock.py             one way to read and write timestamps
+  schemas.py, schemas_insurance.py, schemas_notifications.py
   routers/             identity, customers, accounts, cards, cases, insurance, registry,
                        notifications, signing
   templates/sign.html  signature page
@@ -223,6 +224,7 @@ Each endpoint maps to one webhook tool on any agent platform that can call HTTP 
 - `transactions` waits about one second before answering, like a legacy system would. Have the agent say something while it waits.
 - At the end of the conversation, send a short `call summary`. The API delivers it to the channel the bank has on file and answers `sent: false` when there is none.
 - When `eligibility` answers `eligible: false`, the agent makes no offer. When `verify` answers `locked: true`, the agent opens a handoff case.
+- A handoff for a caller who is not verified has no session token to send. If your platform refuses a tool call when a header variable is empty, give that handoff its own tool without the `X-Session-Token` header.
 
 ### Merchant lookup over MCP
 
