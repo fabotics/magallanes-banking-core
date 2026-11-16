@@ -62,6 +62,7 @@ app/
 db/schema.sql          tables, checks, indexes, row level security
 seed/                  fictional customers and transactions, dated relative to today
 scripts/               seed.py, smoke_test.py, mcp_check.py
+dashboard/             metrics.py and the Streamlit page
 tests/                 one file per area, plus the in-memory repository
 ```
 
@@ -184,6 +185,25 @@ To check a running instance end to end:
 python scripts/smoke_test.py --base-url http://localhost:8000
 ```
 
+## Operations dashboard
+
+A small Streamlit page shows how the agent is doing, computed only from the bank core's own tables (audit log, cases, offers, proposals). It reads; it never writes.
+
+| Group | Metrics |
+| --- | --- |
+| Resolution | Conversations, share with identity verified, share resolved by the agent (verified and no case needed), verifications locked |
+| Escalation | Share escalated to a person, cases opened by type, cards blocked |
+| Offers | Offers made, share of verified conversations that got an offer, acceptance rate, proposals sent and signed |
+
+A conversation is every API call that shares one `conversation_id`. The numbers are computed in `dashboard/metrics.py`, which has its own tests.
+
+```bash
+pip install -r dashboard/requirements.txt
+streamlit run dashboard/streamlit_app.py
+```
+
+It uses the same `.env` as the API. Streamlit is only needed for this page, so it is not in `requirements.txt` and is not part of the deployed API.
+
 ## Deploy
 
 The API runs on Vercel as one Python function with no extra configuration: `app/main.py` exports `app`, dependencies come from `requirements.txt`, and `.python-version` selects Python 3.12.
@@ -226,7 +246,6 @@ python scripts/mcp_check.py --base-url http://localhost:8000
 ## Roadmap
 
 - CRM sync for cases and opportunities.
-- Operations dashboard on the audit, offers and cases tables.
 - Proposal expiry.
 
 ## License
