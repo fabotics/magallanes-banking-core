@@ -22,7 +22,8 @@ class EligibilityResponse(BaseModel):
     products: list[OfferedProduct]
     reason_if_not: str | None = Field(
         default=None,
-        description="already_insured, segment_not_eligible or vulnerable_customer.",
+        description="already_insured, segment_not_eligible, vulnerable_customer or "
+        "not_available_in_country.",
     )
 
 

@@ -13,6 +13,7 @@ from tests.fake_db import InMemoryRepository
 PEOPLE = {
     "carolina": {"document_number": "33161803-9", "card_last4": "1164", "birth_year": 1991},
     "jorge": {"document_number": "30577215-1", "card_last4": "9052", "birth_year": 1948},
+    "lucia": {"document_number": "34141421-0", "card_last4": "3378", "birth_year": 1995},
     "rosa": {"document_number": "90000017", "card_last4": "6410", "birth_year": 1983},
 }
 
@@ -53,8 +54,20 @@ def test_not_eligible_customers_get_a_reason(client: TestClient, person: str, re
 
 def test_segment_rule(client: TestClient, repository: InMemoryRepository) -> None:
     repository.update("insurance_products", {"code": "CARD_FRAUD"}, {"eligible_segments": []})
-    body = client.get("/v1/insurance/eligibility", headers=headers_for(client, "rosa")).json()
+    body = client.get("/v1/insurance/eligibility", headers=headers_for(client, "lucia")).json()
     assert body["eligible"] is False and body["reason_if_not"] == "segment_not_eligible"
+
+
+def test_catalog_is_only_available_in_the_pilot_country(client: TestClient) -> None:
+    headers = headers_for(client, "rosa")
+    body = client.get("/v1/insurance/eligibility", headers=headers).json()
+    assert body == {
+        "eligible": False,
+        "products": [],
+        "reason_if_not": "not_available_in_country",
+    }
+    offer = {"product_code": "CARD_FRAUD", "customer_response": "accepted"}
+    assert client.post("/v1/insurance/offers", json=offer, headers=headers).status_code == 409
 
 
 def test_every_offer_is_stored_as_the_consent_record(

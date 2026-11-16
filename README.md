@@ -14,7 +14,7 @@ A language model follows a prompt most of the time. A bank needs rules that hold
 | Short sessions | A session lasts 15 minutes and belongs to one customer |
 | Limited attempts | Three failed verifications for a document within 15 minutes lock it |
 | Only reversible actions | The only state change on a card is a temporary block. No endpoint moves money |
-| Eligibility is the bank's decision | The API computes which insurance products may be offered. An offer for anything else is refused |
+| Eligibility is the bank's decision | The API computes which insurance products may be offered, from country, segment, policies held and the vulnerable flag. An offer for anything else is refused |
 | Consent is recorded | Every offer and the customer's answer is stored. A sale is signed by the customer on a page, not by voice |
 | Never a dead end | A handoff case can be opened without a verified session, with no customer data attached |
 | Everything is recorded | Every `/v1` call writes an audit row. Tokens and full document numbers are never logged |
@@ -159,7 +159,7 @@ uvicorn app.main:app --reload
 | Jorge | 30.577.215-1 | 9052 | 1948 | Flagged as vulnerable: offers go to a human advisor |
 | Lucia | 34.141.421-0 | 3378 | 1995 | Her card is already blocked |
 
-Five more customers in Peru, Colombia and Mexico use other document types and currencies.
+Five more customers in Peru, Colombia and Mexico use other document types and currencies. The insurance catalog is available in Chile only, so they get `eligible: false` with the reason `not_available_in_country`.
 
 ## Tests
 
