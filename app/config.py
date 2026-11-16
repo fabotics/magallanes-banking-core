@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     demo_telegram_chat_id: str = ""
     app_pin_secret: str = ""
     demo_app_document: str = "314159268"
+    # True once the contact center has a phone line a call can be transferred to.
+    human_line_attached: bool = False
 
 
 @lru_cache
