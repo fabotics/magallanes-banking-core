@@ -8,7 +8,7 @@ from app import quotes
 from app.clock import parse_time, utc_now
 from tests.fake_db import InMemoryRepository
 
-PRODUCT = {"code": "CARD_FRAUD", "monthly_premium": 2990, "currency": "CLP"}
+PRODUCT = {"code": "CARD_FRAUD", "monthly_premium": 11990, "currency": "CLP"}
 TODAY = date(2026, 11, 16)
 
 
@@ -17,10 +17,10 @@ def person(segment: str, birth_date: str = "1986-03-14") -> dict:
 
 
 def test_the_segment_and_the_age_set_the_premium() -> None:
-    assert quotes.premium_for(PRODUCT, person("mass"), TODAY) == 2990
-    assert quotes.premium_for(PRODUCT, person("preferred"), TODAY) == 2690
-    assert quotes.premium_for(PRODUCT, person("premium"), TODAY) == 2540
-    assert quotes.premium_for(PRODUCT, person("mass", "1948-05-09"), TODAY) == 3440
+    assert quotes.premium_for(PRODUCT, person("mass"), TODAY) == 11990
+    assert quotes.premium_for(PRODUCT, person("preferred"), TODAY) == 10790
+    assert quotes.premium_for(PRODUCT, person("premium"), TODAY) == 10190
+    assert quotes.premium_for(PRODUCT, person("mass", "1948-05-09"), TODAY) == 13790
 
 
 def test_age_counts_whole_years() -> None:
@@ -51,10 +51,10 @@ def test_the_quote_number_travels_to_the_offer_the_proposal_and_the_contract(
     assert sent["quote_number"] == quoted["quote_number"]
     assert repository.select("insurance_offers")[0]["quote_number"] == quoted["quote_number"]
     page = client.get(sent["signing_url"].removeprefix("http://localhost:8000")).text
-    assert "$2.690" in page and "$2.990" not in page
+    assert "$10.790" in page and "$11.990" not in page
 
 
 def test_a_product_without_a_quote_keeps_the_catalog_price(repository: InMemoryRepository) -> None:
     product = repository.select("insurance_products", {"code": "CARD_FRAUD"})[0]
     priced = quotes.priced(repository, product, None)
-    assert priced["monthly_premium"] == 2990 and priced["coverage_limit"] is None
+    assert priced["monthly_premium"] == 11990 and priced["coverage_limit"] is None

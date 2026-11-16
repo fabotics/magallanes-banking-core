@@ -14,7 +14,7 @@ TEXTS = {
     "assistant_cta_hint": "By voice or chat, with the virtual assistant.",
     "assistant_title": "Assistant",
     "assistant_heading": "Talk to the bank",
-    "assistant_text": "Use the conversation button below. You are already signed in with your "
+    "assistant_text": "Start a call or a chat below. You are already signed in with your "
     "PIN, so the assistant knows which app to send the confirmation to and will not ask for "
     "your ID number.",
     "assistant_live": "Whatever the assistant sends you shows up here, without leaving the "

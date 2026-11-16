@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Banco Magallanes | {{ t.assistant_title }}</title>
+  {% include "app/_style.html" %}
+  <style>
+    /* This page is the inside of the frame in the Assistant view, never a page of its own. */
+    body { display: flex; flex-direction: column; padding: 0; background: var(--paper); }
+    .intro { padding: 1.4rem 1.15rem 0; }
+    /* The stage is the widget's whole world: it is laid out inside it and cannot leave it. */
+    #stage { position: relative; height: 11rem; transform: translateZ(0); }
+    #stage > :first-child { position: absolute !important; inset: 0 !important; }
+    /* An open conversation takes the whole view. */
+    body.open .intro { display: none; }
+    body.open #stage { flex: 1; height: auto; }
+  </style>
+</head>
+<body>
+  <div class="intro">
+    <h1>{{ t.assistant_heading }}</h1>
+    <p class="muted">{{ t.assistant_text }}</p>
+    <p class="muted small">{{ t.assistant_live }}</p>
+  </div>
+  <div id="stage">{{ embed|safe }}</div>
+<script>
+  // The widget draws a small card while closed and a sheet as tall as its stage once open.
+  // Twice a second, look at how tall its tallest part is. Closed, the stage is a short strip
+  // under the text. A widget that fills its stage is open, and gets the whole view.
+  const stage = document.getElementById("stage");
+
+  function tallest(node, depth) {
+    let height = 0;
+    for (const child of node.children) {
+      if (getComputedStyle(child).pointerEvents !== "none") {
+        height = Math.max(height, child.getBoundingClientRect().height);
+      }
+      if (depth > 1) height = Math.max(height, tallest(child, depth - 1));
+    }
+    return height;
+  }
+
+  setInterval(() => {
+    const widget = stage.firstElementChild;
+    if (!widget || !widget.shadowRoot) return;
+    const open = tallest(widget.shadowRoot, 3) >= stage.clientHeight - 2;
+    document.body.classList.toggle("open", open);
+  }, 500);
+</script>
+</body>
+</html>

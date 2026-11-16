@@ -52,7 +52,7 @@ def test_the_english_speaker_is_a_customer_like_any_other(client: TestClient) ->
     products = client.get("/v1/insurance/eligibility", headers=headers).json()["products"]
     card = next(product for product in products if product["code"] == "CARD_FRAUD")
     # Her own quote: the premium segment pays less and has a higher limit.
-    assert card["monthly_premium"] == 2540 and card["coverage_limit"] == 1_000_000
+    assert card["monthly_premium"] == 10190 and card["coverage_limit"] == 2_000_000
 
 
 def test_her_confirmation_request_is_in_english_with_an_english_link(
@@ -86,7 +86,7 @@ def test_her_proposal_and_policy_arrive_in_english(client: TestClient, sending: 
     headers = session(client, EMMA)
     sent = proposal(client, headers)
     email, message = texts(sending)
-    assert "Card protection and assistance" in email and "Monthly premium: CLP 2,540" in email
+    assert "Card protection and assistance" in email and "Monthly premium: CLP 10,190" in email
     assert f"{sent['signing_url']}?lang=en" in email and "Review and sign the proposal" in email
     assert "Your Card protection and assistance proposal is ready to sign" in message
     assert f"next=/app/proposals/{sent['proposal_number']}&lang=en" in message
@@ -102,7 +102,7 @@ def test_the_spanish_speaker_still_gets_spanish(client: TestClient, sending: lis
     headers = session(client, MARTA)
     sent = proposal(client, headers)
     email, message = texts(sending)
-    assert "Protección de tarjeta y asistencia" in email and "Prima mensual: $2.690" in email
+    assert "Protección de tarjeta y asistencia" in email and "Prima mensual: $10.790" in email
     assert "está lista para firmar" in message and "&lang=es" in message
     assert f"{sent['signing_url']}?lang=es" in email
 
