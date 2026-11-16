@@ -21,7 +21,9 @@ SIGNATURE = {
 @pytest.fixture
 def signed_in(client: TestClient) -> TestClient:
     """A client holding the app session of the golden-path customer."""
-    client.post("/app/login", data={"pin": app_pin(PIN_SECRET, "marta")})
+    client.post(
+        "/app/login", data={"u": seed_id("customer/marta"), "pin": app_pin(PIN_SECRET, "marta")}
+    )
     return client
 
 

@@ -1,10 +1,14 @@
 """The bank's app, part one: the PIN screen, signing in and signing out.
 
-These pages are public, like a phone app anyone can open. Nothing about the
-customer is shown before the PIN, except the first name the app greets with.
+These pages are public, like a phone app anyone can open. The first visit
+asks for the ID number and the PIN. Once someone has signed in, the browser
+remembers them and asks for the PIN only, with a way to sign in as someone
+else. Nothing about a customer is shown before the PIN, except the first
+name the app greets with.
 """
 
 from typing import Annotated
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
@@ -12,11 +16,14 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from app import app_session, audit, i18n
 from app.clock import utc_now
 from app.config import Settings, get_settings
-from app.db import Repository, get_repository
+from app.db import Repository, Row, get_repository
+from app.routers.identity import normalize_document
 
 router = APIRouter(tags=["app"], include_in_schema=False)
 # What the PIN screen says after a failed attempt (a key of the text tables) and the status.
 ERRORS = {"wrong": ("pin_wrong", 401), "locked": ("pin_locked", 429)}
+# The full form never says which of the two was wrong, or whether the ID number is known.
+FORM_ERRORS = {"wrong": ("login_wrong", 401), "locked": ("pin_locked", 429)}
 
 
 def not_enrolled(request: Request) -> Response:
@@ -26,24 +33,57 @@ def not_enrolled(request: Request) -> Response:
     )
 
 
+def login_page(
+    request: Request,
+    customer: Row | None,
+    target: str,
+    error: str | None = None,
+    status: int = 200,
+    document: str = "",
+) -> Response:
+    """Render the sign-in screen: PIN only for a known customer, else ID number and PIN."""
+    other = f"/app?{urlencode({'other': '1', 'next': target})}"
+    context = {
+        "customer": customer, "next": target, "error": error, "document": document, "other": other,
+    }  # fmt: skip
+    # After a failed attempt the language links go back to the same kind of screen.
+    back = {"u": customer["id"], "next": target} if customer else {"other": "1", "next": target}
+    return app_session.page(request, "login", context, status, switch_to=("/app", back))
+
+
 @router.get("/app", response_class=HTMLResponse)
-def pin_screen(
+def sign_in_screen(
     request: Request,
     repository: Annotated[Repository, Depends(get_repository)],
-    settings: Annotated[Settings, Depends(get_settings)],
     u: str | None = None,
     next: str | None = None,
+    other: str | None = None,
 ) -> Response:
-    """Show the PIN screen, or go straight in when a session is already open."""
+    """Show the sign-in screen, or go straight in when a session is already open.
+
+    A link from the bank names the customer (`u`). Without one, the browser's
+    memory of the last sign-in decides. `other` asks for the full form.
+    """
     target = app_session.safe_next(next)
-    if app_session.current_customer(request, repository) is not None:
+    signed_in = app_session.current_customer(request, repository)
+    if signed_in is not None and (u is None or u == signed_in["id"]):
         response = RedirectResponse(target, status_code=303)
         i18n.remember(request, response)
         return response
-    customer = app_session.enrolled_customer(repository, settings, u)
-    if customer is None:
-        return not_enrolled(request)
-    return app_session.page(request, "login", {"customer": customer, "next": target})
+    if u is not None:
+        customer = app_session.customer_by_id(repository, u)
+        return login_page(request, customer, target) if customer else not_enrolled(request)
+    customer = None if other else app_session.remembered_customer(request, repository)
+    return login_page(request, customer, target)
+
+
+def who_signs_in(repository: Repository, fields: dict[str, str]) -> Row | None:
+    """Return the customer a posted form names: by the hidden id, or by the typed ID number."""
+    if "document" in fields:
+        document = normalize_document(fields["document"])
+        found = repository.select("customers", {"document_number": document}) if document else []
+        return found[0] if found else None
+    return app_session.customer_by_id(repository, fields.get("u"))
 
 
 @router.post("/app/login", response_class=HTMLResponse)
@@ -53,19 +93,25 @@ def sign_in(
     repository: Annotated[Repository, Depends(get_repository)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Response:
-    """Check the PIN. A correct one opens a session and sets the cookie."""
+    """Check the PIN. A correct one opens a session and remembers the customer."""
     target = app_session.safe_next(fields.get("next"))
-    customer = app_session.enrolled_customer(repository, settings, fields.get("u"))
+    full_form = "u" not in fields
+    typed = fields.get("document", "")[:20]
+    customer = who_signs_in(repository, fields)
     if customer is None:
-        return not_enrolled(request)
+        if not full_form:
+            return not_enrolled(request)
+        # An unknown ID number gets the same answer as a wrong PIN.
+        audit.record(repository, "/app/login", "POST", None, "app_login_unknown")
+        return login_page(request, None, target, *FORM_ERRORS["wrong"], document=typed)
     now = utc_now()
     result = app_session.try_pin(repository, customer, fields.get("pin", ""), now)
     audit.record(repository, "/app/login", "POST", customer["id"], f"app_pin_{result}")
     if result != "ok":
-        error, status = ERRORS[result]
-        context = {"customer": customer, "next": target, "error": error}
-        back = ("/app", {"u": customer["id"], "next": target})
-        return app_session.page(request, "login", context, status, switch_to=back)
+        if full_form:
+            return login_page(request, None, target, *FORM_ERRORS[result], document=typed)
+        return login_page(request, customer, target, *ERRORS[result])
+    secure = settings.public_base_url.startswith("https://")
     response = RedirectResponse(target, status_code=303)
     response.set_cookie(
         app_session.COOKIE,
@@ -73,7 +119,15 @@ def sign_in(
         max_age=int(app_session.SESSION_LIFETIME.total_seconds()),
         httponly=True,
         samesite="lax",
-        secure=settings.public_base_url.startswith("https://"),
+        secure=secure,
+    )
+    response.set_cookie(
+        app_session.REMEMBER_COOKIE,
+        customer["id"],
+        max_age=app_session.REMEMBER_SECONDS,
+        httponly=True,
+        samesite="lax",
+        secure=secure,
     )
     return response
 
@@ -82,10 +136,11 @@ def sign_in(
 def sign_out(
     request: Request, repository: Annotated[Repository, Depends(get_repository)]
 ) -> Response:
-    """Close the session and forget the cookie."""
+    """Close the session and forget who it was: the next visit starts at the full form."""
     token = request.cookies.get(app_session.COOKIE)
     if token:
         repository.update("app_sessions", {"token": token}, {"expires_at": utc_now().isoformat()})
     response = RedirectResponse("/app", status_code=303)
     response.delete_cookie(app_session.COOKIE)
+    response.delete_cookie(app_session.REMEMBER_COOKIE)
     return response

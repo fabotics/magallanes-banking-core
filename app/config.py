@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     telegram_bot_token: str = ""
     demo_telegram_chat_id: str = ""
     app_pin_secret: str = ""
-    demo_app_document: str = "358979327"
     # True once the contact center has a phone line a call can be transferred to.
     human_line_attached: bool = False
     # The embed snippet of the conversation widget shown in the app, from its provider.

@@ -2,6 +2,7 @@
 
 TEXTS = {
     "sign_out": "Sign out",
+    "log_out": "Log out",
     "footer": "Banco Magallanes is a fictional bank. Demonstration site, with no real "
     "customers or transactions.",
     "back_home": "Back to home",
@@ -30,6 +31,11 @@ TEXTS = {
     "pin_enter": "Sign in",
     "pin_warning": "The bank will never ask for your PIN by phone, email or chat.",
     "pin_wrong": "Wrong PIN. Check it and try again.",
+    "login_heading": "Sign in to your bank",
+    "login_prompt": "Enter your ID number and your four digit PIN.",
+    "document_label": "ID number (RUT)",
+    "login_wrong": "The ID number or the PIN is not right. Check them and try again.",
+    "not_you": "Not {name}? Log in as someone else",
     "pin_locked": "Too many attempts. Wait one minute and try again.",
     "not_enrolled_title": "App not available",
     "not_enrolled_text": "This app is not linked to a customer. Open the link the bank sent you.",
