@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  {% block refresh %}{% endblock %}
+  <title>Banco Magallanes | {% block title %}App{% endblock %}</title>
+  <style>
+    :root { --ink: #16212e; --muted: #5d6b7a; --line: #dfe5ec; --soft: #f4f6f9;
+            --accent: #0b3d6b; --ok: #17753a; --bad: #a12b23; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #e9edf2; color: var(--ink); line-height: 1.45;
+           font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+    .phone { max-width: 27rem; min-height: 100vh; margin: 0 auto; background: #fff;
+             display: flex; flex-direction: column; }
+    @media (min-width: 40rem) {
+      .phone { min-height: 0; margin: 2.5rem auto; border-radius: 18px; overflow: hidden;
+               box-shadow: 0 12px 40px rgba(22, 33, 46, .14); }
+      .phone.wide { max-width: 46rem; }
+    }
+    header { display: flex; align-items: center; justify-content: space-between;
+             padding: 1rem 1.25rem; border-bottom: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: .6rem; font-weight: 650;
+             letter-spacing: .01em; color: var(--accent); text-decoration: none; }
+    .brand svg { width: 28px; height: 28px; }
+    header form { margin: 0; }
+    .link { background: none; border: 0; padding: 0; color: var(--muted); font: inherit;
+            font-size: .9rem; cursor: pointer; text-decoration: underline; }
+    main { padding: 1.5rem 1.25rem 2rem; flex: 1; }
+    h1 { font-size: 1.35rem; margin: 0 0 .35rem; font-weight: 650; }
+    h2 { font-size: .8rem; margin: 1.75rem 0 .6rem; color: var(--muted); font-weight: 600;
+         text-transform: uppercase; letter-spacing: .08em; }
+    p { margin: .5rem 0; }
+    .muted { color: var(--muted); }
+    .small { font-size: .875rem; }
+    .card { border: 1px solid var(--line); border-radius: 12px; padding: 1rem 1.1rem;
+            margin: .6rem 0; background: #fff; }
+    a.card { display: block; color: inherit; text-decoration: none; }
+    a.card:hover { border-color: var(--accent); }
+    .card strong { display: block; }
+    .plastic { background: var(--accent); color: #fff; border: 0; padding: 1.1rem 1.2rem; }
+    .plastic .number { font-size: 1.15rem; letter-spacing: .12em; margin-top: 1.4rem; }
+    .tag { display: inline-block; font-size: .75rem; font-weight: 600; padding: .15rem .5rem;
+           border-radius: 99px; background: var(--soft); color: var(--accent); }
+    .code { font-size: 2.1rem; font-weight: 650; letter-spacing: .3em; text-align: center;
+            padding: 1rem 0; margin: 1rem 0; background: var(--soft); border-radius: 12px;
+            font-variant-numeric: tabular-nums; }
+    button, .button { display: block; width: 100%; padding: .9rem 1rem; border-radius: 10px;
+            border: 1px solid var(--accent); background: var(--accent); color: #fff;
+            font: inherit; font-weight: 600; cursor: pointer; text-align: center;
+            text-decoration: none; }
+    button.secondary, .button.secondary { background: #fff; color: var(--accent); }
+    button + button, form + form { margin-top: .6rem; }
+    .pin { width: 100%; padding: .8rem; font-size: 1.8rem; text-align: center;
+           letter-spacing: .6em; border: 1px solid var(--line); border-radius: 10px;
+           margin: 1rem 0; font-variant-numeric: tabular-nums; }
+    .pin:focus, .signature:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .error { color: var(--bad); font-weight: 600; }
+    .ok { color: var(--ok); font-weight: 600; }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: .4rem 1rem; margin: 1rem 0; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-weight: 600; }
+    footer { padding: 1rem 1.25rem; border-top: 1px solid var(--line); color: var(--muted);
+             font-size: .75rem; }
+    {% block style %}{% endblock %}
+  </style>
+</head>
+<body>
+<div class="phone {% block width %}{% endblock %}">
+  <header>
+    <a class="brand" href="/app">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="15" fill="#0b3d6b"/>
+        <path d="M8 22V10l8 8 8-8v12" fill="none" stroke="#fff" stroke-width="2.6"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Banco Magallanes
+    </a>
+    {% if signed_in %}
+    <form method="post" action="/app/logout"><button class="link" type="submit">Salir</button></form>
+    {% endif %}
+  </header>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer>Banco Magallanes es un banco ficticio. Sitio de demostración, sin clientes ni operaciones reales.</footer>
+</div>
+{% block script %}{% endblock %}
+</body>
+</html>

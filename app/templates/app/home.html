@@ -1,0 +1,44 @@
+{% extends "app/base.html" %}
+{% block title %}Inicio{% endblock %}
+{# A new request appears without the customer touching anything. #}
+{% block refresh %}<meta http-equiv="refresh" content="5">{% endblock %}
+{% block content %}
+  <h1>Hola, {{ customer.first_name }}</h1>
+  <p class="muted">{{ customer.first_name }} {{ customer.last_name }}</p>
+
+  {% if card %}
+  <div class="card plastic">
+    <span class="small">{{ card.label }}</span>
+    <div class="number">•••• •••• •••• {{ card.last4 }}</div>
+  </div>
+  {% endif %}
+
+  <h2>Pendientes</h2>
+  {% for item in confirmations %}
+  <a class="card" href="/app/confirmations/{{ item.id }}">
+    <span class="tag">Confirmar identidad</span>
+    <strong>Alguien en una llamada con el banco pide confirmar que es usted</strong>
+    <span class="muted small">Toque para revisar. La solicitud vence en pocos segundos.</span>
+  </a>
+  {% endfor %}
+  {% for item in proposals %}
+  <a class="card" href="/app/proposals/{{ item.proposal_number }}">
+    <span class="tag">Firmar</span>
+    <strong>{{ item.product_name }}</strong>
+    <span class="muted small">Propuesta {{ item.proposal_number }} · {{ item.premium }} al mes</span>
+  </a>
+  {% endfor %}
+  {% if not confirmations and not proposals %}
+  <p class="muted">No tiene solicitudes pendientes.</p>
+  {% endif %}
+
+  {% if policies %}
+  <h2>Sus seguros</h2>
+  {% for item in policies %}
+  <div class="card">
+    <strong>{{ item.product_name }}</strong>
+    <span class="muted small">Póliza {{ item.policy_number }} · vigente desde el {{ item.start }}</span>
+  </div>
+  {% endfor %}
+  {% endif %}
+{% endblock %}

@@ -52,7 +52,8 @@ def test_the_signing_link_goes_to_the_chat_with_product_and_premium(
     proposal = send(client, marta)
     assert proposal["message_sent"] is True and len(telegram) == 1
     text = telegram[0]["json"]["text"]
-    assert proposal["signing_url"] in text
+    assert f"next=/app/proposals/{proposal['proposal_number']}" in text
+    assert proposal["signing_url"] not in text
     assert "Protección contra fraude de tarjeta" in text and "$2.990" in text
     # Asking again returns the same proposal and sends nothing new.
     offer_id = repository.select("insurance_offers")[0]["id"]

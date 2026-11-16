@@ -56,7 +56,7 @@ def test_the_customer_is_notified_with_the_code_and_a_link_into_the_app(
     text = telegram[0]["json"]["text"]
     assert telegram[0]["json"]["chat_id"] == "42"
     assert f"Código {row['code']}" in text
-    assert f"/app/confirmations/{result['request_id']}" in text
+    assert f"/app?u={row['customer_id']}&next=/app/confirmations/{result['request_id']}" in text
 
 
 def test_an_approval_opens_the_same_session_as_the_spoken_check(

@@ -1,5 +1,7 @@
 """Small helpers for building seed rows: stable ids and national ID check digits."""
 
+import hashlib
+import hmac
 import uuid
 
 CURP_ALPHABET = "0123456789ABCDEFGHIJKLMNÑOPQRSTUVWXYZ"
@@ -43,3 +45,12 @@ def curp_check_digit(first_17: str) -> str:
     for position, character in enumerate(first_17):
         total += CURP_ALPHABET.index(character) * (18 - position)
     return str((10 - total % 10) % 10)
+
+
+def app_pin(secret: str, key: str) -> str:
+    """Derive a customer's four digit app PIN from a secret that is not in the repository.
+
+    The same secret always gives the same PINs, so a reseed does not change them.
+    """
+    digest = hmac.new(secret.encode(), f"app-pin/{key}".encode(), hashlib.sha256).hexdigest()
+    return f"{int(digest, 16) % 10_000:04d}"

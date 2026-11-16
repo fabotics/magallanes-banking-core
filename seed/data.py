@@ -26,6 +26,7 @@ TABLES = [
     "verification_sessions",
     "verification_attempts",
     "identity_confirmations",
+    "app_sessions",
     "audit_log",
     "registry_merchants",
 ]
@@ -73,17 +74,17 @@ PRODUCTS = [
 
 
 def build_seed(
-    today: date | None = None, demo_email: str = "", demo_chat_id: str = ""
+    today: date | None = None, demo_email: str = "", demo_chat_id: str = "", pin_secret: str = ""
 ) -> dict[str, list[dict]]:
     """Build all seed rows relative to `today` (defaults to the current date at the bank).
 
-    Tables that start empty (offers, cases, sessions, audit) are present with
-    no rows, so a reset clears them too.
+    Tables that start empty (offers, proposals, cases, sessions, confirmations,
+    audit) are present with no rows, so a reset clears every pending item too.
     """
     today = today or datetime.now(BANK_TIMEZONE).date()
     rows: dict[str, list[dict]] = {table: [] for table in TABLES}
     rows["insurance_products"] = [dict(product) for product in PRODUCTS]
-    rows["customers"] = build_customers(demo_email, demo_chat_id)
+    rows["customers"] = build_customers(demo_email, demo_chat_id, pin_secret)
     rows["accounts"] = build_accounts(now_iso=at(today, 0, 0))
     rows["cards"] = build_cards(blocked_at_iso=at(today - timedelta(days=3), 16, 20))
     rows["transactions"] = build_transactions(today)
