@@ -79,6 +79,17 @@ def test_the_conversation_starts_with_the_customer_reference_and_the_app_languag
     assert "Talk to the bank" in english
 
 
+def test_the_customer_reference_can_also_be_an_attribute_of_its_own(
+    app: FastAPI, client: TestClient
+) -> None:
+    snippet = '<chat-widget user="{customer}" language="{lang}"></chat-widget>'
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        _env_file=None, bank_api_key=TEST_API_KEY, assistant_embed_html=snippet
+    )
+    page = sign_in(client).get("/app/assistant/widget").text
+    assert f'<chat-widget user="{MARTA_ID}" language="es"></chat-widget>' in page
+
+
 def test_a_snippet_without_a_language_placeholder_still_works(
     app: FastAPI, client: TestClient
 ) -> None:
