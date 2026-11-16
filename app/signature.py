@@ -9,12 +9,12 @@ gets the details in writing, and each step leaves an audit row.
 import secrets
 from datetime import datetime, timedelta
 
-from app import audit, quotes
+from app import audit, notices, quotes
 from app.clock import bank_date, parse_time
 from app.config import Settings
 from app.db import Repository, Row
-from app.email import policy_email, send_email
-from app.formatting import long_date, money
+from app.email import send_email
+from app.formatting import long_date
 from app.messaging import send_telegram
 
 PROPOSAL_LIFETIME = timedelta(days=14)
@@ -80,7 +80,7 @@ def sign(
         proposal_number=proposal["proposal_number"], policy_number=policy["policy_number"],
         **evidence,
     )  # fmt: skip
-    confirm_in_writing(repository, settings, policy, proposal)
+    confirm_in_writing(repository, settings, policy, proposal, evidence.get("language"))
     return policy
 
 
@@ -94,21 +94,27 @@ def signing_record(repository: Repository, proposal: Row) -> Row:
 
 
 def confirm_in_writing(
-    repository: Repository, settings: Settings, policy: Row, proposal: Row
+    repository: Repository,
+    settings: Settings,
+    policy: Row,
+    proposal: Row,
+    language: str | None = None,
 ) -> None:
-    """Send the policy details by email and to the customer's messaging channel."""
+    """Send the policy details by email and to the customer's messaging channel.
+
+    They are written in the language the customer read and signed in.
+    """
     customer = repository.select("customers", {"id": policy["customer_id"]})[0]
+    language = notices.language_for(customer, language)
     product = quotes.for_proposal(repository, proposal)
-    start = long_date(bank_date(parse_time(policy["started_at"])))
-    subject = f"Banco Magallanes: su póliza {policy['policy_number']}"
-    send_email(settings, customer["email"], subject, policy_email(product, policy, start))
+    name, _, premium = notices.priced(product, language)
+    start = long_date(bank_date(parse_time(policy["started_at"])), language)
+    number = policy["policy_number"]
+    subject = notices.WORDS[language]["policy_subject"].format(number=number)
+    html = notices.policy_email(product, policy, start, language)
+    send_email(settings, customer["email"], subject, html)
     if customer["telegram_chat_id"]:
-        text = (
-            "Banco Magallanes\n"
-            f"Su seguro {product['name']} quedó contratado.\n\n"
-            f"Póliza: {policy['policy_number']}\n"
-            f"Vigente desde: {start}\n"
-            f"Prima mensual: {money(product['monthly_premium'], product['currency'])}\n\n"
-            "Puede darlo de baja en cualquier momento desde la app."
+        text = notices.chat(
+            language, "policy", name=name, number=number, start=start, premium=premium
         )
         send_telegram(settings, customer["telegram_chat_id"], text)

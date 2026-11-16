@@ -62,7 +62,8 @@ app/
   contracts.py         builds the contract per product and language, fingerprint, signature checks
   contract_es.py, contract_en.py   the contract wording
   i18n.py, texts_es.py, texts_en.py   language choice and the sentences of the customer pages
-  email.py             optional emails: the proposal, the policy confirmation
+  email.py             optional emails, sent through an HTTP API
+  notices.py           what the bank writes to the customer, in Spanish and English
   signature.py         what happens when a proposal is seen and signed
   formatting.py        amounts and dates as the customer reads them
   messaging.py         optional messages to the customer over Telegram
@@ -170,7 +171,7 @@ A wrong answer never says which field was wrong:
 
 On a wide screen the app is drawn inside a phone frame; on a phone it fills the screen. The look is the bank's own: a deep green-blue, ice and a copper accent, with the Southern Cross as the mark.
 
-The pages exist in Spanish and English. Spanish is the default, `?lang=en` in the link opens them in English, a switch on every screen (the PIN screen and the signing link included) changes it, and the choice lasts for the visit. The contract has the same pages and clauses in both languages. Messages and emails to the customer stay in Spanish, the bank's language.
+The pages exist in Spanish and English. Spanish is the default, `?lang=en` in the link opens them in English, a switch on every screen (the PIN screen and the signing link included) changes it, and the choice lasts for the visit. The contract has the same pages and clauses in both languages. Messages and emails follow the language of the call: the caller sends `language` (`es` or `en`) when it asks for a confirmation, sends a proposal or sends the call summary, and without it the language on file for the customer is used. Links in a message carry the same language, so the page opens in the language of the message. The confirmation of a signature is written in the language the contract was read and signed in.
 
 A signature records what was read: the audit row of `proposal_signed` carries the language the contract was shown in and a SHA-256 fingerprint of that exact wording, and the result screen shows the start of the fingerprint.
 
@@ -202,12 +203,13 @@ python scripts/seed.py --reset
 uvicorn app.main:app --reload
 ```
 
-`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the demo customer gets them, so proposals, confirmations and call summaries reach you. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, pending confirmations, proposals and app sessions, and restores every app PIN, which unlocks a locked customer.
+`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the two demo customers (Emma, who speaks English, and Marta, who speaks Spanish) get them, so proposals, confirmations and call summaries reach you. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, pending confirmations, proposals and app sessions, and restores every app PIN, which unlocks a locked customer.
 
 ### Seed customers
 
 | Customer | Document | Card | Birth year | Story |
 | --- | --- | --- | --- | --- |
+| Emma | 35.897.932-7 | 6302 | 1988 | English speaker living in Santiago. Sees five charges dated Monday and bought nothing on Monday: five rounds at one restaurant and bar on Saturday night, posted together. Eligible for insurance, premium segment |
 | Marta | 31.415.926-8 | 4821 | 1986 | Sees four charges dated Monday and bought nothing on Monday: four rounds at one restaurant on Saturday night, posted together. Eligible for insurance |
 | Pedro Pablo | 32.718.281-1 | 7730 | 1979 | Two online charges at night from abroad, in dollars |
 | Carolina | 33.161.803-9 | 1164 | 1991 | Already holds the card product |
@@ -268,7 +270,7 @@ Each endpoint maps to one webhook tool on any agent platform that can call HTTP 
 - After either path, keep `session_token` for the rest of the conversation and send it in `X-Session-Token`.
 - Pass the platform's conversation ID as `conversation_id` when verifying. The API then ties every later call, case and offer to that conversation.
 - Keep `offer_id` from `offers` to request the proposal, and read `case_number` and block `reference` back to the customer.
-- After `proposals`, tell the customer where the link is and that nothing is active until they sign. If they sign while still on the call, read the proposal status with `wait=20` and confirm the policy number and start date as soon as it says signed. The catalog is written in the customers' language, so the agent says names, cover and prices as they come.
+- After `proposals`, tell the customer where the link is and that nothing is active until they sign. If they sign while still on the call, read the proposal status with `wait=20` and confirm the policy number and start date as soon as it says signed. The catalog is written in Spanish, so in Spanish the agent says names, cover and prices as they come. In English it uses the wording of the English contract.
 - `transactions` waits about one second before answering, like a legacy system would. Have the agent say something while it waits.
 - At the end of the conversation, send a short `call summary`. The API delivers it to the channel the bank has on file and answers `sent: false` when there is none.
 - `eligibility` returns a quote per product. The premium and the limit are computed by the bank's rules from the customer's segment and age (`app/quotes.py`): the agent reads them out and never changes them. The quote number is kept on the offer, the proposal and the contract.

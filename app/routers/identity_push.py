@@ -51,7 +51,9 @@ def request_confirmation(
         return PushResponse(status="locked")
 
     confirmation = confirmations.create(repository, document, customer, body.conversation_id, now)
-    notified = customer is not None and confirmations.notify(settings, customer, confirmation)
+    notified = customer is not None and confirmations.notify(
+        settings, customer, confirmation, body.language
+    )
     audit.note(
         request,
         customer_id=customer["id"] if customer else None,

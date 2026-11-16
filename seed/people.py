@@ -14,10 +14,14 @@ from seed.helpers import app_pin, curp_check_digit, rut, seed_id
 CURRENCY_BY_COUNTRY = {"CL": "CLP", "PE": "PEN", "CO": "COP", "MX": "MXN"}
 
 SOFIA_CURP = "ROGS900514MDFBRF0"
+# The two customers a demo is run with: an English speaker and a Spanish speaker.
+DEMO_CUSTOMERS = ("emma", "marta")
 
 # key, document type, document number, first name, last name, birth date,
 # country, language, segment, vulnerable
 PEOPLE = [
+    ("emma", "RUT", rut(35897932), "Emma", "Whitfield", "1988-04-09",
+     "CL", "en", "premium", False),
     ("marta", "RUT", rut(31415926), "Marta", "Rojas Fuentes", "1986-03-14",
      "CL", "es", "preferred", False),
     ("pedro", "RUT", rut(32718281), "Pedro Pablo", "Soto Aravena", "1979-11-02",
@@ -42,6 +46,7 @@ PEOPLE = [
 
 # The phone the bank has on file, in international format. All invented.
 PHONES = {
+    "emma": "+56955503589",
     "marta": "+56955501426", "pedro": "+56955502718", "carolina": "+56955503161",
     "jorge": "+56955500577", "lucia": "+56955504141", "rosa": "+51955500017",
     "diego": "+51955500025", "camila": "+573555000123", "andres": "+573555000456",
@@ -50,6 +55,7 @@ PHONES = {
 
 # customer key, account type, available balance
 ACCOUNTS = [
+    ("emma", "checking", 2318400), ("emma", "savings", 5420000),
     ("marta", "checking", 1284500), ("marta", "savings", 3150000),
     ("pedro", "checking", 742300), ("carolina", "sight", 96400),
     ("jorge", "sight", 412000), ("lucia", "sight", 58200),
@@ -60,6 +66,7 @@ ACCOUNTS = [
 
 # customer key, last four digits, brand, type, status, daily limit
 CARDS = [
+    ("emma", "6302", "visa", "credit", "active", 2000000),
     ("marta", "4821", "visa", "credit", "active", 1500000),
     ("pedro", "7730", "mastercard", "credit", "active", 1200000),
     ("carolina", "1164", "visa", "credit", "active", 600000),
@@ -94,7 +101,7 @@ def build_customers(
 ) -> list[dict]:
     """Build the customer rows.
 
-    The golden-path customer gets the demo email and Telegram chat when given,
+    The two demo customers get the demo email and Telegram chat when given,
     so proposals and call summaries reach a real inbox during a demo. Every
     customer gets an app PIN derived from `pin_secret`; without it nobody can
     sign in to the app.
@@ -102,9 +109,10 @@ def build_customers(
     rows = []
     for key, doc_type, doc_number, first, last, birth, country, language, segment, weak in PEOPLE:
         email = f"{key}.{last.split()[0].lower()}@example.com"
-        if key == "marta" and demo_email:
+        demo = key in DEMO_CUSTOMERS
+        if demo and demo_email:
             email = demo_email
-        chat_id = demo_chat_id if key == "marta" and demo_chat_id else None
+        chat_id = demo_chat_id if demo and demo_chat_id else None
         rows.append({
             "id": seed_id(f"customer/{key}"), "document_type": doc_type,
             "document_number": doc_number, "first_name": first, "last_name": last,
