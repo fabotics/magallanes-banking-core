@@ -4,7 +4,7 @@ from datetime import date
 
 from fastapi.testclient import TestClient
 
-from app import contract_en, contract_es, contracts, texts_en, texts_es
+from app import contract_en, contract_es, contracts, quotes, texts_en, texts_es
 from app.clock import bank_date, parse_time
 from app.formatting import card_label, long_date, money
 from seed.helpers import app_pin, seed_id
@@ -115,17 +115,18 @@ def test_identity_confirmation_in_english(client: TestClient) -> None:
 
 def test_the_contract_is_fully_in_english(client: TestClient, marta: dict) -> None:
     number = proposal(sign_in(client), marta)["proposal_number"]
-    assert "Card fraud protection" in client.get("/app/home").text
+    assert "Card protection and assistance" in client.get("/app/home").text
     page = client.get(f"/app/proposals/{number}").text
     for expected in (
-        "Review and sign your proposal", "Insurance proposal", "Card fraud protection",
-        "CLP 2,990", "Visa credit card ending in 4821", "Policyholder and intermediary",
-        "Unauthorized charges", "Exclusions", "Right of withdrawal", "Early termination",
+        "Review and sign your proposal", "Insurance proposal", "Card protection and assistance",
+        "CLP 2,690", "Visa credit card ending in 4821", "Policyholder and intermediary",
+        "Cash stolen after a withdrawal", "Quote No.", "CLP 500,000", "Exclusions",
+        "Right of withdrawal", "Early termination",
         "Electronic signature", f"Proposal {number} · Page 4 of 4", 'data-label="Initials"',
         "Click to sign", "Sign and take out the policy", 'name="lang" value="en"',
     ):  # fmt: skip
         assert expected in page
-    for spanish in ("Coberturas", "Derecho de retracto", "Protección contra fraude", "Firmar"):
+    for spanish in ("Coberturas", "Derecho de retracto", "Protección de tarjeta", "Firmar"):
         assert spanish not in page
     incomplete = client.post(f"/app/proposals/{number}", data={**SIGNATURE, "accept": ""})
     assert incomplete.status_code == 422 and "final confirmation is not ticked" in incomplete.text
@@ -158,7 +159,7 @@ def test_the_fingerprint_is_of_the_wording_in_that_language(
     detail = signed_detail(repository)
     stored = repository.select("proposals")[0]
     customer = repository.select("customers", {"id": stored["customer_id"]})[0]
-    product = repository.select("insurance_products", {"code": "CARD_FRAUD"})[0]
+    product = quotes.for_proposal(repository, stored)
     card = repository.select("cards", {"customer_id": customer["id"]})[0]
     issued = bank_date(parse_time(stored["created_at"]))
     prints = {
@@ -178,8 +179,8 @@ def test_the_signing_link_in_english(
     spanish = client.get(link).text
     assert "Firmar propuesta" in spanish and f"{link}?lang=en" in spanish
     english = client.get(f"{link}?lang=en").text
-    assert "Sign proposal" in english and "Card fraud protection" in english
-    assert "CLP 2,990" in english and "Monthly premium" in english
+    assert "Sign proposal" in english and "Card protection and assistance" in english
+    assert "CLP 2,690" in english and "Monthly premium" in english
     signed = client.post(link)
     assert "Proposal signed. Your insurance is now active." in signed.text
     assert signed_detail(repository)["language"] == "en"

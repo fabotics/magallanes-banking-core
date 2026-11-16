@@ -2,7 +2,8 @@
 
 Everyone here is invented. Chilean document numbers use the 30 to 35 million
 range, which has not been issued to anyone, and carry a valid check digit.
-Document numbers are stored without dots or hyphens.
+Document numbers are stored without dots or hyphens. Phone numbers use the
+555 block that is reserved for fiction.
 """
 
 from functools import lru_cache
@@ -38,6 +39,14 @@ PEOPLE = [
     ("sofia", "CURP", SOFIA_CURP + curp_check_digit(SOFIA_CURP), "Sofia", "Robles Garcia",
      "1990-05-14", "MX", "es", "preferred", False),
 ]  # fmt: skip
+
+# The phone the bank has on file, in international format. All invented.
+PHONES = {
+    "marta": "+56955501426", "pedro": "+56955502718", "carolina": "+56955503161",
+    "jorge": "+56955500577", "lucia": "+56955504141", "rosa": "+51955500017",
+    "diego": "+51955500025", "camila": "+573555000123", "andres": "+573555000456",
+    "sofia": "+525555000514",
+}  # fmt: skip
 
 # customer key, account type, available balance
 ACCOUNTS = [
@@ -99,7 +108,7 @@ def build_customers(
         rows.append({
             "id": seed_id(f"customer/{key}"), "document_type": doc_type,
             "document_number": doc_number, "first_name": first, "last_name": last,
-            "birth_date": birth, "email": email, "phone": None, "telegram_chat_id": chat_id,
+            "birth_date": birth, "email": email, "phone": PHONES[key], "telegram_chat_id": chat_id,
             "country": country, "preferred_language": language, "segment": segment,
             "is_vulnerable": weak, "app_pin_hash": pin_hash(pin_secret, key),
             "app_failed_pins": 0, "app_locked_until": None,

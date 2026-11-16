@@ -2,17 +2,36 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class PushRequest(BaseModel):
-    """Ask the customer to confirm who they are in the bank's app."""
+    """Ask the customer to confirm who they are in the bank's app.
 
-    customer_id: str = Field(
+    Name the customer in one of three ways, whichever the channel gives: the
+    reference a conversation started inside the app carries, the number a phone
+    call comes from, or the national ID number the customer says.
+    """
+
+    customer_id: str | None = Field(
+        default=None,
         description="The customer's national ID number, as they say it. "
-        "Dots and hyphens are ignored."
+        "Dots and hyphens are ignored.",
+    )
+    customer_ref: str | None = Field(
+        default=None, description="The customer reference a conversation from the app carries."
+    )
+    phone: str | None = Field(
+        default=None, description="The caller's phone number. Matched to the phone on file."
     )
     conversation_id: str | None = Field(default=None, description="Caller's conversation ID.")
+
+    @model_validator(mode="after")
+    def names_a_customer(self) -> "PushRequest":
+        """Refuse a request that names nobody."""
+        if not (self.customer_id or self.customer_ref or self.phone):
+            raise ValueError("Send customer_id, customer_ref or phone.")
+        return self
 
 
 class PushResponse(BaseModel):

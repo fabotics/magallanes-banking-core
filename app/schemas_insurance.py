@@ -6,13 +6,16 @@ from pydantic import BaseModel, Field
 
 
 class OfferedProduct(BaseModel):
-    """An insurance product the bank pre-approves for this customer."""
+    """A product the bank pre-approves for this customer, with their personal quote."""
 
     code: str
     name: str
-    monthly_premium: float
+    monthly_premium: float = Field(description="The quoted premium for this customer.")
     currency: str
     coverage_summary: str
+    quote_number: str
+    coverage_limit: float = Field(description="The most the insurance pays per event.")
+    valid_until: str = Field(description="ISO date until which the quote can be accepted.")
 
 
 class EligibilityResponse(BaseModel):
@@ -59,6 +62,7 @@ class ProposalResponse(BaseModel):
     """The proposal. `signing_url` is absent when the customer only asked for information."""
 
     proposal_number: str
+    quote_number: str | None = None
     signing_url: str | None = None
     sent_to: str = Field(description="Masked address, safe to read aloud.")
     email_sent: bool = Field(description="False when the API is not configured to send email.")

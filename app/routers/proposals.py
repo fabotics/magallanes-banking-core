@@ -12,7 +12,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request
 
-from app import audit, signature
+from app import audit, quotes, signature, waiting
 from app.app_session import app_link
 from app.clock import bank_date, parse_time, utc_now
 from app.config import Settings, get_settings
@@ -82,6 +82,7 @@ def create_proposal(
                 "offer_id": offer["id"],
                 "customer_id": customer["id"],
                 "product_code": offer["product_code"],
+                "quote_number": offer.get("quote_number"),
                 "proposal_number": f"PR-{utc_now().year}-{secrets.token_hex(3).upper()}",
                 "signing_token": secrets.token_urlsafe(24) if accepted else None,
                 "status": "sent",
@@ -92,7 +93,7 @@ def create_proposal(
         )
     link = signing_link(settings, proposal)
     if not existing:
-        product = repository.select("insurance_products", {"code": offer["product_code"]})[0]
+        product = quotes.for_proposal(repository, proposal)
         subject = f"Banco Magallanes: {product['name']}"
         email_sent = send_email(settings, customer["email"], subject, proposal_email(product, link))
         message_sent = send_to_messaging(settings, customer, product, proposal)
@@ -106,6 +107,7 @@ def create_proposal(
     )
     return ProposalResponse(
         proposal_number=proposal["proposal_number"],
+        quote_number=proposal.get("quote_number"),
         signing_url=link,
         sent_to=proposal["sent_to"],
         email_sent=email_sent,
@@ -123,13 +125,21 @@ def proposal_status(
     request: Request,
     session: Annotated[Row, Depends(session_from_request)],
     repository: Annotated[Repository, Depends(get_repository)],
+    wait: waiting.Wait = 0,
 ) -> ProposalStatusResponse:
-    """Say whether the customer has signed. Once signed, give the policy number and start date."""
+    """Say whether the customer has signed. Once signed, give the policy number and start date.
+
+    With `wait`, the answer is held while the proposal is unsigned, so the
+    caller learns of the signature without asking again.
+    """
     filters = {"proposal_number": proposal_id, "customer_id": session["customer_id"]}
-    proposals = repository.select("proposals", filters)
-    if not proposals:
+    if not repository.select("proposals", filters):
         raise ApiError(404, "proposal_not_found", "No such proposal for this customer.")
-    proposal = proposals[0]
+    proposal = waiting.until_settled(
+        lambda: repository.select("proposals", filters)[0],
+        lambda row: signature.proposal_status(row, utc_now()) != "pending",
+        wait,
+    )
     status = signature.proposal_status(proposal, utc_now())
     audit.note(request, outcome=f"proposal_{status}", proposal_number=proposal["proposal_number"])
     policy = signature.policy_for(repository, proposal) if status == "signed" else None

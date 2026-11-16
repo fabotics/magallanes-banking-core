@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app import contracts, i18n, signature
+from app import contracts, i18n, quotes, signature
 from app.clock import bank_date, parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
@@ -37,7 +37,7 @@ def render(request: Request, repository: Repository, proposal: Row | None) -> HT
         response = templates.TemplateResponse(request, "sign.html", context, 404)
         i18n.remember(request, response)
         return response
-    product = repository.select("insurance_products", {"code": proposal["product_code"]})[0]
+    product = quotes.for_proposal(repository, proposal)
     policy = signature.policy_for(repository, proposal)
     name, cover = contracts.product_wording(product, language)
     start = long_date(bank_date(parse_time(policy["started_at"])), language) if policy else None

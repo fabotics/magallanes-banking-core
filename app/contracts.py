@@ -35,20 +35,26 @@ def product_wording(product: Row, language: str) -> tuple[str, str]:
 def build(
     language: str, proposal: Row, product: Row, customer: Row, card: Row | None, issued: date
 ) -> dict:
-    """Assemble the four pages for one proposal, in one language."""
+    """Assemble the four pages for one proposal, in one language.
+
+    `product` carries the premium, the limit and the number of the customer's quote.
+    """
     words = CONTRACT[language]
     name, summary = product_wording(product, language)
     premium = money(product["monthly_premium"], product["currency"], language)
     paid_with = card_label(card, language) if card else words["any_card"]
+    limit = "-"
+    if product.get("coverage_limit"):
+        limit = money(product["coverage_limit"], product["currency"], language)
     values = [
         proposal["proposal_number"], long_date(issued, language), INSURER, "Banco Magallanes",
         f"{customer['first_name']} {customer['last_name']}",
         document(customer["document_type"], customer["document_number"]), name, premium,
-        paid_with, words["term"],
+        paid_with, words["term"], product.get("quote_number") or "-", limit,
     ]  # fmt: skip
     labels = list(words["labels"])
     labels[5] = customer["document_type"]
-    cover = words["cover"].get(product["code"], [summary])
+    cover = [line.format(limit=limit) for line in words["cover"].get(product["code"], [summary])]
     exclusions = [*words["exclusions"].get(product["code"], []), words["general_exclusion"]]
     general = [
         (heading, text.format(premium=premium, card=paid_with))

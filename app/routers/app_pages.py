@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, Response
 
-from app import app_session, audit, confirmations, contracts, i18n, signature
+from app import app_session, audit, confirmations, contracts, i18n, quotes, signature
 from app.clock import bank_date, parse_time, utc_now
 from app.db import Repository, Row, get_repository
 from app.formatting import card_label, long_date, money
@@ -27,10 +27,20 @@ ANSWERS = {
 
 
 def named(repository: Repository, rows: list[Row], language: str) -> list[Row]:
-    """Add the product name and the formatted premium to proposal or policy rows."""
+    """Add the product name and the formatted premium to proposal or policy rows.
+
+    The premium is the one quoted to the customer. A policy finds its quote
+    through the proposal that was signed.
+    """
     catalog = {row["code"]: row for row in repository.select("insurance_products")}
     for row in rows:
-        product = catalog[row["product_code"]]
+        source = row
+        if "proposal_id" in row:
+            signed = repository.select("proposals", {"id": row["proposal_id"]})
+            source = signed[0] if row["proposal_id"] and signed else {}
+        product = quotes.priced(
+            repository, catalog[row["product_code"]], source.get("quote_number")
+        )
         row["product_name"] = contracts.product_wording(product, language)[0]
         row["premium"] = money(product["monthly_premium"], product["currency"], language)
     return rows
