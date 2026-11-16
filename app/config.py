@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     # `{variables}` in it is replaced by the customer reference, as JSON, `{customer}` by the
     # reference alone, and `{lang}` by the language of the app. Empty: no widget.
     assistant_embed_html: str = ""
+    # The CRM that mirrors the insurance sale. Empty instance URL: nothing is mirrored.
+    salesforce_instance_url: str = ""
+    salesforce_client_id: str = ""
+    salesforce_client_secret: str = ""
+    salesforce_api_version: str = "v65.0"
 
 
 @lru_cache

@@ -121,7 +121,7 @@ Interactive documentation is served at `/docs`.
 | GET `/v1/cases/routes` | no | How the customer can reach a person right now: at once (needs a phone line and service hours), a callback, or a meeting |
 | POST `/v1/cases` | handoff: optional | Fraud case, handoff, complaint, callback or meeting, as a `service` case or a `sales_lead`. Returns a case number |
 | GET `/v1/insurance/eligibility` | yes | Products the bank pre-approves, each with a personal quote (number, premium, limit per event, valid until), or the reason there are none |
-| POST `/v1/insurance/offers` | yes | Record an offer and the answer: accepted, declined, info_requested |
+| POST `/v1/insurance/offers` | yes | Record an offer and how it ended. `outcome` is `sent` (the customer wants the proposal), `interested` (they want to read it first) or `declined`, with a `loss_reason` for a no: `not_interested`, `price`, `already_insured` or `other`. The older `customer_response` (accepted, declined, info_requested) still works |
 | POST `/v1/insurance/proposals` | yes | Create the proposal for an offer and send it by email and to the customer's chat. It is a contract to sign whether the customer accepted or asked for the details: signing is what accepts. Asking again sends the same proposal again. `valid_until` is the last day to sign, 15 days like the quote |
 | GET `/v1/insurance/proposals/{proposal_number}` | yes | pending, signed or expired. Once signed: the policy number and the start date. `wait` (0 to 20 seconds) holds the request while it is unsigned |
 | POST `/v1/notifications/call-summary` | yes | Send a written summary of the call to the customer's messaging channel (Telegram) |
@@ -183,6 +183,30 @@ Signing in works like a bank's phone app. The first visit to `/app` asks for the
 The assistant screen does not contain a vendor's widget. `ASSISTANT_EMBED_HTML` holds the embed snippet of whichever conversation widget is used, and the app replaces `{variables}` in it with `{"channel": "app", "channel_identity": "<customer id>"}`, and `{customer}` with the customer id alone, for a widget that takes the reference as an attribute of its own. With that, the agent can send the identity confirmation to this app without asking for a document number (`identity/push` with `customer_ref`). The reference only says where the confirmation goes: the approval behind the PIN is still what verifies the customer. A production app would hand the widget a short-lived signed token minted by the bank's server instead of a plain reference. The app also replaces `{lang}` with its own language (`es` or `en`), so the widget speaks the language of the screen, and the ES and EN switch reloads it in the other one. The widget lives in a frame that fills the Assistant view, between the header and the menu: closed, it is a card under the introduction; open, it takes the whole view. It can never cover the header or the menu, and it exists on the Assistant tab only. What the assistant sends is drawn on top of the conversation. Once the Assistant view is open, the conversation survives moving around the app: links and forms are fetched and only the content of the page is replaced (`app/templates/app/_stay.html`), so the frame with the call is never reloaded. Signing out and changing language still load a new page.
 
 PINs are not in this repository. The seed script derives each customer's PIN from `APP_PIN_SECRET` and stores only a salted PBKDF2 hash. `python scripts/seed.py --pins` prints them for whoever holds the secret.
+
+## CRM sync
+
+The bank core is the record that counts. When a CRM is configured, each step of the insurance sale is also copied to Salesforce, from the API itself, right after the bank has stored it. The agent has no CRM tool for the sale and never hears about the copy: a failure is logged, written on the audit row of the call (`crm: failed`), and changes no answer.
+
+| What happens at the bank | What appears in the CRM |
+| --- | --- |
+| A customer is verified, by the app or by the spoken check | A Contact, found by `Customer_Reference__c` (the customer's reference). First name, last name and country only: no document number, email or phone |
+| An offer is logged | A Lead named after the customer, with the product as its company, and an Opportunity in stage `Offered`. Amount is the yearly premium (the quoted monthly premium times 12) and the close date is the last day of the quote |
+| The customer says no | The Opportunity is created `Closed Lost`, with the `Loss_Reason__c` the caller passed |
+| The proposal is sent | Stage `Proposal Sent`, with the proposal number |
+| The customer signs, in the app or on the signing link | Stage `Closed Won`, with the policy number and the day of the signature as close date |
+
+Every record carries the lead source `Voice agent`. Records are found by external IDs (`Customer_Reference__c`, `Offer_Reference__c`), so a repeated call updates and never duplicates. The code is two small modules: `app/crm.py` signs in with the OAuth 2.0 client credentials flow and sends requests with an eight second limit, and `app/crm_sync.py` says what is copied at each step.
+
+Set `SALESFORCE_INSTANCE_URL`, `SALESFORCE_CLIENT_ID`, `SALESFORCE_CLIENT_SECRET` and `SALESFORCE_API_VERSION` (see `.env.example`). Without the instance URL nothing is sent, so tests and local runs stay offline. Three scripts go with it:
+
+```bash
+python scripts/crm_setup.py         # once per org: stages, lead source, fields, permission set, list views
+python scripts/crm_seed.py          # about 400 fictional customers across the funnel; --wipe removes them
+python scripts/crm_check.py         # one whole sale, in memory at the bank, checked in the CRM itself
+```
+
+`crm_setup.py` adds the stages `Offered` and `Proposal Sent`, the fields above plus `Seeded__c`, and a list view "Voice agent funnel" for opportunities and leads, newest first. `crm_seed.py` invents its customers (names from two lists, document numbers from a range that was never issued, no emails or phones), marks every record `Seeded__c = true`, and updates the same records when it runs again. `crm_check.py` verifies the main demo customer, logs the offer, sends the proposal and signs it, and after each step reads the Opportunity back: the stages must be Offered, Proposal Sent, Closed Won, and the signed sale must be the first row of the list view.
 
 ## Run it locally
 

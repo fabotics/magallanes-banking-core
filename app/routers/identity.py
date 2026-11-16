@@ -11,8 +11,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from app import audit
+from app import audit, crm_sync
 from app.clock import parse_time, utc_now
+from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.schemas import VerifyRequest, VerifyResponse
 
@@ -83,6 +84,7 @@ def verify_identity(
     body: VerifyRequest,
     request: Request,
     repository: Annotated[Repository, Depends(get_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> VerifyResponse:
     """Verify the customer and open a session. A failure never says which field was wrong."""
     now = utc_now()
@@ -114,4 +116,5 @@ def verify_identity(
 
     token = open_session(repository, customer, body.conversation_id, now)
     audit.note(request, customer_id=customer["id"], outcome="verified")
+    crm_sync.noted(request, crm_sync.customer_verified(settings, customer))
     return VerifyResponse(verified=True, session_token=token, first_name=customer["first_name"])
