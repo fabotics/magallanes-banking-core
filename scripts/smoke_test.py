@@ -35,7 +35,7 @@ class Smoke:
         """Run one request, print its status, and return the JSON body if there is one."""
         response = self.client.request(method, path, **kwargs)
         verdict = "ok" if response.status_code == expected else f"FAIL, expected {expected}"
-        print(f"{name:34} {method:4} {path:28} {response.status_code}  {verdict}")
+        print(f"{name:34} {method:4} {path:36} {response.status_code}  {verdict}")
         if response.status_code != expected:
             self.failures += 1
         is_json = response.headers.get("content-type", "").startswith("application/json")
@@ -55,6 +55,7 @@ def run(smoke: Smoke) -> None:
     smoke.step("profile", 200, "GET", "/v1/customers/me", headers=session)
     smoke.step("balances", 200, "GET", "/v1/accounts/balance", headers=session)
     smoke.step("transactions", 200, "GET", "/v1/cards/transactions", headers=session)
+    smoke.step("merchant behind a tax ID", 200, "GET", "/v1/registry/merchants/66871234-7")
     smoke.step("eligibility", 200, "GET", "/v1/insurance/eligibility", headers=session)
     offer = smoke.step(
         "offer: asked for details", 200, "POST", "/v1/insurance/offers", headers=session,
