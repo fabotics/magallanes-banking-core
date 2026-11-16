@@ -18,7 +18,11 @@ create table if not exists customers (
     country text not null,
     preferred_language text not null default 'es',
     segment text not null check (segment in ('mass', 'preferred', 'premium')),
-    is_vulnerable boolean not null default false
+    is_vulnerable boolean not null default false,
+    -- The bank's app: a hashed PIN, and a short lock after three wrong attempts.
+    app_pin_hash text,
+    app_failed_pins integer not null default 0,
+    app_locked_until timestamptz
 );
 
 create table if not exists accounts (
@@ -110,6 +114,9 @@ create table if not exists proposals (
 -- Columns added after the first release. A database created by an earlier
 -- version of this file gets them here; on a new database these lines do nothing.
 alter table policies add column if not exists policy_number text unique;
+alter table customers add column if not exists app_pin_hash text;
+alter table customers add column if not exists app_failed_pins integer not null default 0;
+alter table customers add column if not exists app_locked_until timestamptz;
 alter table policies add column if not exists proposal_id uuid;
 alter table proposals add column if not exists viewed_at timestamptz;
 
@@ -171,6 +178,15 @@ create table if not exists identity_confirmations (
     decided_at timestamptz
 );
 
+-- A signed-in session of the bank's app, opened with the PIN. Ten minutes.
+create table if not exists app_sessions (
+    id uuid primary key default gen_random_uuid(),
+    token text not null unique,
+    customer_id uuid not null references customers (id),
+    created_at timestamptz not null default now(),
+    expires_at timestamptz not null
+);
+
 create table if not exists audit_log (
     id uuid primary key default gen_random_uuid(),
     at timestamptz not null default now(),
@@ -217,6 +233,7 @@ alter table cases enable row level security;
 alter table verification_sessions enable row level security;
 alter table verification_attempts enable row level security;
 alter table identity_confirmations enable row level security;
+alter table app_sessions enable row level security;
 alter table audit_log enable row level security;
 alter table registry_merchants enable row level security;
 

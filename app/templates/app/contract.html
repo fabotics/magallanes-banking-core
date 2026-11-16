@@ -1,0 +1,137 @@
+{% extends "app/base.html" %}
+{% block title %}Propuesta {{ proposal.proposal_number }}{% endblock %}
+{% block width %}wide{% endblock %}
+{% block style %}
+    .sheet { border: 1px solid var(--line); border-radius: 4px; padding: 2rem 1.75rem 1rem;
+             margin: 1rem 0; font-family: Georgia, "Times New Roman", serif; font-size: .95rem;
+             box-shadow: 0 1px 3px rgba(22, 33, 46, .08); }
+    .sheet h3 { font-size: 1.05rem; margin: 0 0 .25rem; text-transform: uppercase;
+                letter-spacing: .04em; }
+    .sheet h4 { font-size: .95rem; margin: 1.25rem 0 .35rem; }
+    .sheet table { width: 100%; border-collapse: collapse; margin: .75rem 0; }
+    .sheet td { padding: .4rem .5rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+    .sheet td:first-child { color: var(--muted); width: 38%; }
+    .sheet ol, .sheet ul { padding-left: 1.2rem; }
+    .sheet li { margin: .35rem 0; }
+    .sheetfoot { display: flex; justify-content: space-between; align-items: center; gap: 1rem;
+                 margin-top: 1.5rem; padding-top: .75rem; border-top: 1px solid var(--line);
+                 font: .8rem system-ui, sans-serif; color: var(--muted); }
+    .initial { display: flex; align-items: center; gap: .5rem; cursor: pointer; }
+    .initial input { position: absolute; opacity: 0; }
+    .initial .box { width: 4.2rem; height: 2.3rem; border: 1.5px dashed var(--accent);
+                    border-radius: 6px; display: grid; place-items: center; color: var(--accent);
+                    font-size: .7rem; }
+    .initial .box::after { content: "Iniciales"; }
+    .initial input:checked + .box { border-style: solid; background: var(--soft); }
+    .initial input:checked + .box::after { content: attr(data-initials); font-size: 1.25rem;
+                    font-family: "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive; }
+    .initial input:focus-visible + .box { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .signing { border: 1px solid var(--line); border-radius: 12px; padding: 1.25rem; margin: 1.5rem 0; }
+    .signature { width: 100%; border: 0; border-bottom: 1.5px solid var(--ink); padding: .4rem .2rem;
+                 font-size: 2rem; color: #14306b; background: transparent;
+                 font-family: "Snell Roundhand", "Segoe Script", "Brush Script MT", cursive; }
+    .signline { display: flex; justify-content: space-between; gap: 1rem; font-size: .8rem;
+                color: var(--muted); margin: .35rem 0 1rem; }
+    .check { display: flex; gap: .6rem; align-items: flex-start; margin: 1rem 0; font-size: .9rem; }
+    .check input { margin-top: .25rem; width: 1.1rem; height: 1.1rem; accent-color: var(--accent); }
+{% endblock %}
+{% macro sheet_foot(number) %}
+      <div class="sheetfoot">
+        <span>Propuesta {{ proposal.proposal_number }} · Página {{ number }} de {{ total }}</span>
+        <label class="initial">
+          <input type="checkbox" name="initial_{{ number }}" value="yes" required
+                 aria-label="Iniciales en la página {{ number }}">
+          <span class="box" data-initials="{{ initials }}"></span>
+        </label>
+      </div>
+{% endmacro %}
+{% block content %}
+  <h1>Revise y firme su propuesta</h1>
+  <p class="muted">Lea las {{ total }} páginas, marque sus iniciales en cada una y firme al final. Nada queda contratado hasta que usted firme.</p>
+  {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+
+  <form method="post" id="contract">
+    <section class="sheet">
+      <h3>Propuesta de seguro</h3>
+      <p>{{ product.name }}. Condiciones particulares.</p>
+      <table>
+        <tr><td>Propuesta N°</td><td>{{ proposal.proposal_number }}</td></tr>
+        <tr><td>Fecha de emisión</td><td>{{ issued }}</td></tr>
+        <tr><td>Compañía aseguradora</td><td>{{ insurer }}</td></tr>
+        <tr><td>Contratante e intermediario</td><td>Banco Magallanes</td></tr>
+        <tr><td>Asegurado</td><td>{{ customer.first_name }} {{ customer.last_name }}</td></tr>
+        <tr><td>{{ customer.document_type }}</td><td>{{ document }}</td></tr>
+        <tr><td>Producto</td><td>{{ product.name }}</td></tr>
+        <tr><td>Prima mensual</td><td>{{ premium }}</td></tr>
+        <tr><td>Medio de pago</td><td>{{ card_label }}</td></tr>
+        <tr><td>Vigencia</td><td>Mensual, con renovación automática. Comienza el día de la firma.</td></tr>
+      </table>
+      {{ sheet_foot(1) }}
+    </section>
+
+    <section class="sheet">
+      <h3>Coberturas</h3>
+      <p>La compañía aseguradora cubre al asegurado, durante la vigencia de la póliza, en los términos siguientes.</p>
+      <ol>{% for clause in cover %}<li>{{ clause }}</li>{% endfor %}</ol>
+      {{ sheet_foot(2) }}
+    </section>
+
+    <section class="sheet">
+      <h3>Exclusiones</h3>
+      <p>Esta póliza no cubre:</p>
+      <ol>{% for clause in exclusions %}<li>{{ clause }}</li>{% endfor %}</ol>
+      {{ sheet_foot(3) }}
+    </section>
+
+    <section class="sheet">
+      <h3>Condiciones generales</h3>
+      <h4>Prima y forma de pago</h4>
+      <p>La prima de {{ premium }} se carga cada mes a la {{ card_label }}. El primer cargo se hace en la fecha de la firma.</p>
+      <h4>Derecho de retracto</h4>
+      <p>El asegurado puede dejar sin efecto este contrato dentro de los 10 días siguientes a la firma, sin expresar causa. La prima pagada se devuelve completa.</p>
+      <h4>Término anticipado</h4>
+      <p>El asegurado puede dar de baja el seguro en cualquier momento, sin costo, desde la app o por teléfono. El cobro termina desde el período mensual siguiente.</p>
+      <h4>Denuncia de siniestros</h4>
+      <p>Los siniestros se denuncian por los canales de atención del banco. La compañía aseguradora responde dentro de 10 días hábiles desde que recibe los antecedentes.</p>
+      <h4>Datos personales</h4>
+      <p>Los datos del asegurado se usan solo para administrar esta póliza y no se entregan a terceros con otro fin.</p>
+      <h4>Firma electrónica</h4>
+      <p>El asegurado declara que leyó este documento y que su firma electrónica en la app del banco tiene el mismo valor que su firma manuscrita.</p>
+      {{ sheet_foot(4) }}
+    </section>
+
+    <section class="signing">
+      <h2 style="margin-top:0">Firma</h2>
+      <p class="small muted">Escriba su nombre completo tal como aparece en la propuesta: {{ customer.first_name }} {{ customer.last_name }}.</p>
+      <button type="button" id="start" class="secondary" hidden>Haga clic para firmar</button>
+      <div id="pad">
+        <input class="signature" name="signature_name" autocomplete="off" required
+               aria-label="Nombre completo, como firma" value="{{ typed_name }}">
+        <div class="signline"><span>Firma del asegurado</span><span id="stamp">{{ issued }}</span></div>
+      </div>
+      <label class="check">
+        <input type="checkbox" name="accept" value="yes" required>
+        <span>Confirmo que leí las {{ total }} páginas, que acepto contratar {{ product.name }} por {{ premium }} al mes con cargo a mi tarjeta, y que esta es mi firma.</span>
+      </label>
+      <button type="submit">Firmar y contratar</button>
+    </section>
+  </form>
+{% endblock %}
+{% block script %}
+<script>
+  // Click to sign: the signature line appears when the customer asks for it,
+  // and the time next to it is the moment they started signing.
+  const start = document.getElementById("start");
+  const pad = document.getElementById("pad");
+  if (!pad.querySelector("input").value) {
+    pad.hidden = true;
+    start.hidden = false;
+  }
+  start.addEventListener("click", () => {
+    start.hidden = true;
+    pad.hidden = false;
+    document.getElementById("stamp").textContent = new Date().toLocaleString("es-CL");
+    pad.querySelector("input").focus();
+  });
+</script>
+{% endblock %}

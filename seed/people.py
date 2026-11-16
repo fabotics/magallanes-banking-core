@@ -5,7 +5,10 @@ range, which has not been issued to anyone, and carry a valid check digit.
 Document numbers are stored without dots or hyphens.
 """
 
-from seed.helpers import curp_check_digit, rut, seed_id
+from functools import lru_cache
+
+from app.pins import hash_pin
+from seed.helpers import app_pin, curp_check_digit, rut, seed_id
 
 CURRENCY_BY_COUNTRY = {"CL": "CLP", "PE": "PEN", "CO": "COP", "MX": "MXN"}
 
@@ -66,11 +69,26 @@ def country_of(key: str) -> str:
     return next(person[6] for person in PEOPLE if person[0] == key)
 
 
-def build_customers(demo_email: str = "", demo_chat_id: str = "") -> list[dict]:
+@lru_cache
+def pin_hash(pin_secret: str, key: str) -> str | None:
+    """Return the stored form of a customer's app PIN, or None when no secret is set.
+
+    Hashing is slow on purpose, so the result is remembered for the process.
+    """
+    if not pin_secret:
+        return None
+    return hash_pin(app_pin(pin_secret, key), seed_id(f"customer/{key}"))
+
+
+def build_customers(
+    demo_email: str = "", demo_chat_id: str = "", pin_secret: str = ""
+) -> list[dict]:
     """Build the customer rows.
 
     The golden-path customer gets the demo email and Telegram chat when given,
-    so proposals and call summaries reach a real inbox during a demo.
+    so proposals and call summaries reach a real inbox during a demo. Every
+    customer gets an app PIN derived from `pin_secret`; without it nobody can
+    sign in to the app.
     """
     rows = []
     for key, doc_type, doc_number, first, last, birth, country, language, segment, weak in PEOPLE:
@@ -83,7 +101,8 @@ def build_customers(demo_email: str = "", demo_chat_id: str = "") -> list[dict]:
             "document_number": doc_number, "first_name": first, "last_name": last,
             "birth_date": birth, "email": email, "phone": None, "telegram_chat_id": chat_id,
             "country": country, "preferred_language": language, "segment": segment,
-            "is_vulnerable": weak,
+            "is_vulnerable": weak, "app_pin_hash": pin_hash(pin_secret, key),
+            "app_failed_pins": 0, "app_locked_until": None,
         })  # fmt: skip
     return rows
 

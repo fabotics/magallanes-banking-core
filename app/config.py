@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     email_from: str = "Banco Magallanes <onboarding@resend.dev>"
     telegram_bot_token: str = ""
     demo_telegram_chat_id: str = ""
+    app_pin_secret: str = ""
+    demo_app_document: str = "314159268"
 
 
 @lru_cache

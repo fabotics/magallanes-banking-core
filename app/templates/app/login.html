@@ -1,0 +1,15 @@
+{% extends "app/base.html" %}
+{% block title %}Ingreso{% endblock %}
+{% block content %}
+  <h1>Hola, {{ customer.first_name }}</h1>
+  <p class="muted">Ingrese su PIN de cuatro dígitos para continuar.</p>
+  <form method="post" action="/app/login">
+    <input type="hidden" name="u" value="{{ customer.id }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <input class="pin" type="password" name="pin" inputmode="numeric" pattern="[0-9]{4}"
+           maxlength="4" autocomplete="off" aria-label="PIN" required autofocus>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <button type="submit">Ingresar</button>
+  </form>
+  <p class="muted small">El banco nunca le pedirá su PIN por teléfono, correo ni mensajería.</p>
+{% endblock %}
