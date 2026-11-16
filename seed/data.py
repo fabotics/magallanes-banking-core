@@ -80,7 +80,11 @@ PRODUCTS = [
 
 
 def build_seed(
-    today: date | None = None, demo_email: str = "", demo_chat_id: str = "", pin_secret: str = ""
+    today: date | None = None,
+    demo_email: str = "",
+    demo_chat_id: str = "",
+    pin_secret: str = "",
+    demo_phone: str = "",
 ) -> dict[str, list[dict]]:
     """Build all seed rows relative to `today` (defaults to the current date at the bank).
 
@@ -90,7 +94,7 @@ def build_seed(
     today = today or datetime.now(BANK_TIMEZONE).date()
     rows: dict[str, list[dict]] = {table: [] for table in TABLES}
     rows["insurance_products"] = [dict(product) for product in PRODUCTS]
-    rows["customers"] = build_customers(demo_email, demo_chat_id, pin_secret)
+    rows["customers"] = build_customers(demo_email, demo_chat_id, pin_secret, demo_phone)
     rows["accounts"] = build_accounts(now_iso=at(today, 0, 0))
     rows["cards"] = build_cards(blocked_at_iso=at(today - timedelta(days=3), 16, 20))
     rows["transactions"] = build_transactions(today)

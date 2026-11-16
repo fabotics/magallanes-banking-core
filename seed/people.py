@@ -97,14 +97,15 @@ def pin_hash(pin_secret: str, key: str) -> str | None:
 
 
 def build_customers(
-    demo_email: str = "", demo_chat_id: str = "", pin_secret: str = ""
+    demo_email: str = "", demo_chat_id: str = "", pin_secret: str = "", demo_phone: str = ""
 ) -> list[dict]:
     """Build the customer rows.
 
     The two demo customers get the demo email and Telegram chat when given,
     so proposals and call summaries reach a real inbox during a demo. Every
     customer gets an app PIN derived from `pin_secret`; without it nobody can
-    sign in to the app.
+    sign in to the app. `demo_phone` replaces the phone on file of the first
+    demo customer only: a phone number names one customer.
     """
     rows = []
     for key, doc_type, doc_number, first, last, birth, country, language, segment, weak in PEOPLE:
@@ -113,10 +114,11 @@ def build_customers(
         if demo and demo_email:
             email = demo_email
         chat_id = demo_chat_id if demo and demo_chat_id else None
+        phone = demo_phone if demo_phone and key == DEMO_CUSTOMERS[0] else PHONES[key]
         rows.append({
             "id": seed_id(f"customer/{key}"), "document_type": doc_type,
             "document_number": doc_number, "first_name": first, "last_name": last,
-            "birth_date": birth, "email": email, "phone": PHONES[key], "telegram_chat_id": chat_id,
+            "birth_date": birth, "email": email, "phone": phone, "telegram_chat_id": chat_id,
             "country": country, "preferred_language": language, "segment": segment,
             "is_vulnerable": weak, "app_pin_hash": pin_hash(pin_secret, key),
             "app_failed_pins": 0, "app_locked_until": None,

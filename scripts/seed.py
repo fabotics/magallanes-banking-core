@@ -24,11 +24,22 @@ from seed.helpers import app_pin  # noqa: E402
 from seed.people import PEOPLE  # noqa: E402
 
 
-def reset(repository: Repository, demo_email: str, demo_chat_id: str, pin_secret: str = "") -> None:
+def reset(
+    repository: Repository,
+    demo_email: str,
+    demo_chat_id: str,
+    pin_secret: str = "",
+    demo_phone: str = "",
+) -> None:
     """Delete all rows, children first, then insert the seed rows, parents first."""
     for table in reversed(TABLES):
         repository.delete_all(table, PRIMARY_KEYS.get(table, "id"))
-    seed = build_seed(demo_email=demo_email, demo_chat_id=demo_chat_id, pin_secret=pin_secret)
+    seed = build_seed(
+        demo_email=demo_email,
+        demo_chat_id=demo_chat_id,
+        pin_secret=pin_secret,
+        demo_phone=demo_phone,
+    )
     for table, rows in seed.items():
         repository.insert_many(table, rows)
 
@@ -64,6 +75,7 @@ def main() -> None:
             settings.demo_customer_email,
             settings.demo_telegram_chat_id,
             settings.app_pin_secret,
+            settings.demo_customer_phone.replace(" ", ""),
         )
         print("Reset done.")
     print_counts(repository)
