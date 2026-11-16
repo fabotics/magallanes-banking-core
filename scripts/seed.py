@@ -40,7 +40,7 @@ def print_counts(repository: Repository) -> None:
 
 
 def print_pins(pin_secret: str) -> None:
-    """Print the ID number and the app PIN of every seed customer. They exist only if a secret is set."""
+    """Print each seed customer's ID number and app PIN. PINs exist only if a secret is set."""
     if not pin_secret:
         sys.exit("APP_PIN_SECRET is not set, so no customer has an app PIN.")
     for key, _, document, first_name, *_ in PEOPLE:
