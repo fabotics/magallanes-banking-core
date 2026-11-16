@@ -182,3 +182,11 @@ def test_signing_out_and_expiry_end_the_session(
     sign_in(client)
     assert client.post("/app/logout", follow_redirects=False).headers["location"] == "/app"
     assert client.get("/app/home", follow_redirects=False).status_code == 303
+
+
+def test_reloading_the_sign_in_or_sign_out_address_goes_back_to_the_sign_in_screen(
+    client: TestClient,
+) -> None:
+    for address in ("/app/login", "/app/logout"):
+        answer = client.get(address, follow_redirects=False)
+        assert answer.status_code == 303 and answer.headers["location"] == "/app"
