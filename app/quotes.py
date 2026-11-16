@@ -15,7 +15,7 @@ from app.db import Repository, Row
 QUOTE_LIFETIME = timedelta(days=15)
 # Rule 1: the segment changes the premium and sets the limit per event.
 SEGMENT_FACTOR = {"mass": 1.0, "preferred": 0.9, "premium": 0.85}
-COVERAGE_LIMIT = {"mass": 300_000, "preferred": 500_000, "premium": 1_000_000}
+COVERAGE_LIMIT = {"mass": 1_000_000, "preferred": 1_500_000, "premium": 2_000_000}
 # Rule 2: from this age the premium carries a surcharge.
 SENIOR_AGE = 65
 SENIOR_FACTOR = 1.15
