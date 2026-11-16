@@ -1,12 +1,14 @@
 {# The bank's visual identity: the strait at dusk (deep green-blue), ice, and a copper accent. #}
+{% include "app/_brand.html" %}
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Manrope:wght@400;500;600;700&display=swap">
 <style>
-  :root { --deep: #0b2530; --sea: #0f4c5c; --tide: #1b6b7a; --ice: #eef4f3; --paper: #fbfcfb;
-          --ink: #10242b; --muted: #5f7379; --line: #dbe5e4; --copper: #c2622a;
-          --copper-soft: #fbeee4; --ok: #1c7a4b; --bad: #a8322a; --accent: var(--sea);
-          --soft: var(--ice); --radius: 16px;
+  /* The brand colours come from `_brand.html`. The rest are the app's own. */
+  :root { --deep: var(--bm-deep); --sea: var(--bm-sea); --tide: #1b6b7a; --ice: var(--bm-ice);
+          --paper: #fbfcfb; --ink: #10242b; --muted: #5f7379; --line: #dbe5e4;
+          --copper: var(--bm-copper); --copper-soft: #fbeee4; --ok: #1c7a4b; --bad: #a8322a;
+          --accent: var(--sea); --soft: var(--ice); --radius: 16px;
           --display: "Fraunces", Georgia, "Times New Roman", serif;
           --text: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   * { box-sizing: border-box; }
@@ -19,9 +21,13 @@
             padding: .85rem 1.15rem; background: var(--deep); color: #fff; }
   .brand { display: flex; align-items: center; gap: .6rem; color: #fff; text-decoration: none;
            font: 600 1.12rem/1 var(--display); letter-spacing: .01em; }
-  .brand svg { width: 30px; height: 30px; flex: none; }
-  .brand small { display: block; font: 600 .58rem/1 var(--text); letter-spacing: .2em;
-                 text-transform: uppercase; color: #9fc3c6; margin-bottom: .22rem; }
+  /* The symbol is 32px tall. The gap to the wordmark is 0.30 of that, as in the lockup. */
+  .brand svg { width: 32px; height: 32px; flex: none; }
+  .brand small { display: block; font: 600 .58rem/1 var(--text); letter-spacing: .24em;
+                 text-transform: uppercase; color: var(--bm-mist); margin-bottom: .22rem; }
+  /* The lockup on a document. It keeps a quarter of its height free on every side. The
+     wordmark is live text and can run a hair past its box, so it is never cut off. */
+  .lockup { display: block; height: 32px; width: auto; margin: 8px; overflow: visible; }
   .langs { display: flex; gap: .1rem; padding: .15rem; border-radius: 99px;
            background: rgba(255, 255, 255, .1); font-size: .72rem; font-weight: 700; }
   .langs a { padding: .22rem .55rem; border-radius: 99px; color: #b9d3d5; text-decoration: none; }
