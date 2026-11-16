@@ -1,8 +1,9 @@
 """Proposals: what the customer receives after an offer, and whether they signed it.
 
 A proposal exists only for an offer the customer accepted or asked details
-about. It goes out by email and to the customer's messaging channel at once,
-so the customer can sign while still on the call. Nothing is contracted until
+about. It goes out at once: by email with the signing link, and to the
+customer's chat with a link to the contract in the bank's app, so the customer
+can sign while still on the call. Nothing is contracted until
 they sign, and the agent can only read the result, never sign for them.
 """
 
@@ -12,6 +13,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Request
 
 from app import audit, signature
+from app.app_session import app_link
 from app.clock import bank_date, parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
@@ -32,15 +34,16 @@ def signing_link(settings: Settings, proposal: Row) -> str | None:
     return f"{settings.public_base_url.rstrip('/')}/sign/{proposal['signing_token']}"
 
 
-def send_to_messaging(settings: Settings, customer: Row, product: Row, link: str | None) -> bool:
-    """Send the signing link, with the product and its premium, to the customer's chat."""
-    if not link or not customer["telegram_chat_id"]:
+def send_to_messaging(settings: Settings, customer: Row, product: Row, proposal: Row) -> bool:
+    """Send a link to the contract in the app, with the product and premium, to the chat."""
+    if not proposal["signing_token"] or not customer["telegram_chat_id"]:
         return False
+    link = app_link(settings, customer, f"/app/proposals/{proposal['proposal_number']}")
     text = (
         "Banco Magallanes\n"
         f"Su propuesta de {product['name']} está lista para firmar.\n"
         f"Prima mensual: {money(product['monthly_premium'], product['currency'])}\n\n"
-        f"Revise y firme aquí: {link}\n"
+        f"Revise y firme en la app: {link}\n"
         "Nada queda contratado hasta que usted firme."
     )
     return send_telegram(settings, customer["telegram_chat_id"], text)
@@ -92,7 +95,7 @@ def create_proposal(
         product = repository.select("insurance_products", {"code": offer["product_code"]})[0]
         subject = f"Banco Magallanes: {product['name']}"
         email_sent = send_email(settings, customer["email"], subject, proposal_email(product, link))
-        message_sent = send_to_messaging(settings, customer, product, link)
+        message_sent = send_to_messaging(settings, customer, product, proposal)
 
     audit.note(
         request,

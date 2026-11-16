@@ -13,6 +13,7 @@ from tests.fake_db import InMemoryRepository
 
 TEST_API_KEY = "test-key"
 BOT_TOKEN = "123456:test-bot-token"
+PIN_SECRET = "test-pin-secret"
 API_KEY = {"X-API-Key": TEST_API_KEY}
 MARTA = {"document_number": "31.415.926-8", "card_last4": "4821", "birth_year": 1986}
 
@@ -25,7 +26,7 @@ def fixed_settings() -> Settings:
 @pytest.fixture
 def repository() -> InMemoryRepository:
     """An in-memory database loaded with the seed data."""
-    return InMemoryRepository(build_seed())
+    return InMemoryRepository(build_seed(pin_secret=PIN_SECRET))
 
 
 @pytest.fixture

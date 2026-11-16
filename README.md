@@ -2,6 +2,8 @@
 
 A mock banking core API for Banco Magallanes, a fictional Latin American retail bank. It is built to be called by conversational agents as tools: verify a customer, read balances and card transactions, block a card, open a case for a person, check insurance eligibility, record an offer and send a proposal to sign.
 
+It also serves the customer's side of those conversations: a small mock of the bank's phone app at `/app`, where the customer approves an identity confirmation and reads and signs the insurance contract.
+
 Everything in it is invented: the bank, the customers, the document numbers, the merchants.
 
 ## Why it looks the way it does
@@ -31,9 +33,9 @@ A language model follows a prompt most of the time. A bank needs rules that hold
           v
   +-----------------------------+        +--------------------+
   |  Banking core API (FastAPI) |        |  Customer browser  |
-  |                             | <----- |  /sign/{token}     |
-  |  security   API key, session|        +--------------------+
-  |  audit      one row per call|
+  |                             | <----- |  /app  (PIN)       |
+  |  security   API key, session|        |  /sign/{token}     |
+  |  audit      one row per call|        +--------------------+
   |  routers    one per domain  |
   |  db         repository      |
   +-----------------------------+
@@ -42,7 +44,7 @@ A language model follows a prompt most of the time. A bank needs rules that hold
   Postgres on Supabase (row level security on every table)
 ```
 
-Stack: Python 3.12, FastAPI, Postgres on Supabase through the `supabase` client, Jinja2 for the signature page, the MCP Python SDK for the merchant lookup tool, pytest and ruff. Hosted as a single serverless function.
+Stack: Python 3.12, FastAPI, Postgres on Supabase through the `supabase` client, Jinja2 for the customer pages, the MCP Python SDK for the merchant lookup tool, pytest and ruff. Hosted as a single serverless function.
 
 All database access goes through one small repository interface in `app/db.py`. The tests replace it with an in-memory version loaded with the same seed data, so they need no network.
 
@@ -55,6 +57,9 @@ app/
   db.py                repository: every database call
   errors.py            one error shape: {"error", "message"}
   confirmations.py     identity confirmation requests answered in the bank's app
+  app_session.py       the customer app: PIN check, lock, session cookie
+  pins.py              PIN hashing
+  contracts.py         contract wording per product, signature checks
   email.py             optional emails: the proposal, the policy confirmation
   signature.py         what happens when a proposal is seen and signed
   formatting.py        amounts and dates as the customer reads them
@@ -63,8 +68,9 @@ app/
   clock.py             one way to read and write timestamps
   schemas.py, schemas_identity.py, schemas_insurance.py, schemas_notifications.py
   routers/             identity, identity_push, customers, accounts, cards, cases, insurance,
-                       proposals, registry, notifications, signing
-  templates/sign.html  signature page
+                       proposals, registry, notifications, signing,
+                       app_auth, app_pages, app_contract
+  templates/           sign.html (signing link) and app/ (the customer app)
 db/schema.sql          tables, checks, indexes, row level security
 seed/                  fictional customers and transactions, dated relative to today
 scripts/               seed.py, smoke_test.py, mcp_check.py
@@ -76,7 +82,7 @@ tests/                 one file per area, plus the in-memory repository
 
 | Table | Purpose |
 | --- | --- |
-| `customers` | Who the bank knows: document, name, segment, language, vulnerable flag |
+| `customers` | Who the bank knows: document, name, segment, language, vulnerable flag, and the hashed PIN of their app |
 | `accounts` | Balances per account |
 | `cards` | Cards and their status: active, blocked_temporary, blocked |
 | `transactions` | Card movements as on a statement: a cryptic descriptor, sometimes a merchant tax ID, never a merchant name |
@@ -88,6 +94,7 @@ tests/                 one file per area, plus the in-memory repository
 | `verification_sessions` | Proof that identity was verified, with an expiry |
 | `verification_attempts` | Used by the lockout rule, for both identity paths |
 | `identity_confirmations` | Requests to confirm identity in the bank's app: code, status, expiry |
+| `app_sessions` | Signed-in sessions of the customer app, ten minutes each |
 | `audit_log` | One row per API call: endpoint, customer, conversation, outcome |
 | `registry_merchants` | Stand-in for the public company registry: the business behind a merchant tax ID |
 
@@ -114,6 +121,7 @@ Interactive documentation is served at `/docs`.
 | GET `/v1/insurance/proposals/{proposal_number}` | yes | pending, signed or expired. Once signed: the policy number and the start date |
 | POST `/v1/notifications/call-summary` | yes | Send a written summary of the call to the customer's messaging channel (Telegram) |
 | GET `/v1/registry/merchants/{tax_id}` | no | The business behind a merchant tax ID |
+| `/app` and `/app/...` | PIN | The customer app, described below |
 | GET, POST `/sign/{token}` | no | Signature page. Signing creates the policy and sends the customer a confirmation |
 | POST `/mcp` | no | MCP server with one tool, `lookup_merchant`. Same key, in `X-API-Key` or as a bearer token |
 
@@ -143,6 +151,22 @@ A wrong answer never says which field was wrong:
 {"verified": false, "locked": false, "attempts_remaining": 2}
 ```
 
+## The customer app
+
+`/app` is a mock of the bank's phone app, rendered by the API as plain HTML and CSS. It exists so that the two steps a bank will not take by voice can be shown end to end: proving identity and signing a contract.
+
+| Screen | What it does |
+| --- | --- |
+| PIN | Four digits. Three wrong PINs lock the app for one minute. Before the PIN only the first name is shown |
+| Home | Name, masked card, and what is waiting: identity confirmations and proposals to sign |
+| Identity confirmation | The code of the request, with approve and deny. Anything but an explicit approval is a denial |
+| Contract | Four numbered pages: particulars, cover, exclusions, general conditions. Initials on each page, the full name typed as the signature, a final confirmation. The server checks all three |
+| Result | Policy number and start date. The same details go out by email and to the chat |
+
+A phone app belongs to one customer, so links sent to the chat name the customer (`/app?u=<customer id>&next=<page>`), and the PIN proves it is them. Opened with no customer named, `/app` is the demo customer's app. A session lasts ten minutes in an `HttpOnly`, `SameSite=Lax` cookie, pages are sent with `Cache-Control: no-store`, and redirects never leave `/app`.
+
+PINs are not in this repository. The seed script derives each customer's PIN from `APP_PIN_SECRET` and stores only a salted PBKDF2 hash. `python scripts/seed.py --pins` prints them for whoever holds the secret.
+
 ## Run it locally
 
 You need Python 3.12 and a Supabase project (the free tier is enough).
@@ -154,7 +178,7 @@ pip install -r requirements-dev.txt
 cp .env.example .env
 ```
 
-Fill `.env`: the Supabase project URL, its secret key (not the publishable one), the Postgres connection string, and a `BANK_API_KEY` of your own (`openssl rand -hex 32`).
+Fill `.env`: the Supabase project URL, its secret key (not the publishable one), the Postgres connection string, and a `BANK_API_KEY` and an `APP_PIN_SECRET` of your own (`openssl rand -hex 32` for each).
 
 Create the tables, load the seed data and start the API:
 
@@ -165,7 +189,7 @@ python scripts/seed.py --reset
 uvicorn app.main:app --reload
 ```
 
-`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the demo customer gets them, so proposals, confirmations and call summaries reach you. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, which unlocks a locked customer.
+`python scripts/seed.py --reset` wipes every table and reloads the seed. If `DEMO_CUSTOMER_EMAIL` and `DEMO_TELEGRAM_CHAT_ID` are set, the demo customer gets them, so proposals, confirmations and call summaries reach you. Dates are relative to the day it runs, so the story is always recent. It also clears verification attempts, pending confirmations, proposals and app sessions, and restores every app PIN, which unlocks a locked customer.
 
 ### Seed customers
 

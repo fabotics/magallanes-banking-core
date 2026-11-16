@@ -13,6 +13,9 @@ from app.config import Settings, get_settings
 from app.errors import register_error_handlers
 from app.routers import (
     accounts,
+    app_auth,
+    app_contract,
+    app_pages,
     cards,
     cases,
     customers,
@@ -75,6 +78,10 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
     app.include_router(v1)
     # The signature page is public: the customer opens it from a link, without an API key.
     app.include_router(signing.router)
+    # The customer app is public too: it asks for the customer's PIN itself.
+    app.include_router(app_auth.router)
+    app.include_router(app_pages.router)
+    app.include_router(app_contract.router)
     # The MCP endpoint checks the same API key itself, in a header or as a bearer token.
     app.include_router(mcp_server.router)
     return app

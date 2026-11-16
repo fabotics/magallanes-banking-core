@@ -1,0 +1,13 @@
+{% extends "app/base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+  <h1>{{ title }}</h1>
+  <p class="{{ tone or 'muted' }}">{{ text }}</p>
+  {% if details %}
+  <dl>
+    {% for label, value in details %}<dt>{{ label }}</dt><dd>{{ value }}</dd>{% endfor %}
+  </dl>
+  {% endif %}
+  {% if note %}<p class="muted small">{{ note }}</p>{% endif %}
+  {% if signed_in %}<p><a class="button secondary" href="/app/home">Volver al inicio</a></p>{% endif %}
+{% endblock %}

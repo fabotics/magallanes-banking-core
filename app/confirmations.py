@@ -13,6 +13,7 @@ call must not be able to read it aloud.
 import secrets
 from datetime import datetime, timedelta
 
+from app.app_session import app_link
 from app.clock import parse_time
 from app.config import Settings
 from app.db import Repository, Row
@@ -56,7 +57,7 @@ def notify(settings: Settings, customer: Row, confirmation: Row) -> bool:
     """Tell the customer, on their messaging channel, that a confirmation is waiting."""
     if not customer["telegram_chat_id"]:
         return False
-    link = f"{settings.public_base_url.rstrip('/')}/app/confirmations/{confirmation['id']}"
+    link = app_link(settings, customer, f"/app/confirmations/{confirmation['id']}")
     text = (
         "Banco Magallanes\n"
         "Alguien en una llamada con Banco Magallanes pide confirmar su identidad. "
