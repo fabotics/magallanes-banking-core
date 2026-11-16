@@ -2,40 +2,15 @@
 
 import httpx
 import pytest
-from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.config import Settings, get_settings
 from seed.data import build_seed
 from seed.helpers import seed_id
-from tests.conftest import API_KEY, TEST_API_KEY
+from tests.conftest import API_KEY, BOT_TOKEN
 from tests.fake_db import InMemoryRepository
 
 URL = "/v1/notifications/call-summary"
 SUMMARY = {"summary": "Reconociste el cargo del restaurante. No se hizo ningun cambio."}
-BOT_TOKEN = "123456:test-bot-token"
-
-
-@pytest.fixture
-def with_bot(app: FastAPI, repository: InMemoryRepository) -> None:
-    """Configure a bot token and give the golden-path customer a Telegram chat."""
-    app.dependency_overrides[get_settings] = lambda: Settings(
-        _env_file=None, bank_api_key=TEST_API_KEY, telegram_bot_token=BOT_TOKEN
-    )
-    repository.update("customers", {"id": seed_id("customer/marta")}, {"telegram_chat_id": "42"})
-
-
-@pytest.fixture
-def telegram(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
-    """Replace the HTTP call to Telegram and record what would have been sent."""
-    calls: list[dict] = []
-
-    def fake_post(url: str, **kwargs: object) -> httpx.Response:
-        calls.append({"url": url, **kwargs})
-        return httpx.Response(200, request=httpx.Request("POST", url))
-
-    monkeypatch.setattr(httpx, "post", fake_post)
-    return calls
 
 
 def test_summary_goes_to_the_chat_on_file(

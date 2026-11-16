@@ -141,6 +141,21 @@ create table if not exists verification_attempts (
     created_at timestamptz not null default now()
 );
 
+-- A request to confirm identity in the bank's app. Pending for 90 seconds.
+-- customer_id is null when the document is unknown: the request then just expires.
+create table if not exists identity_confirmations (
+    id uuid primary key default gen_random_uuid(),
+    customer_id uuid references customers (id),
+    document_number text not null,
+    code text not null,
+    status text not null default 'pending' check (status in ('pending', 'approved', 'denied')),
+    conversation_id text,
+    session_token text,
+    created_at timestamptz not null default now(),
+    expires_at timestamptz not null,
+    decided_at timestamptz
+);
+
 create table if not exists audit_log (
     id uuid primary key default gen_random_uuid(),
     at timestamptz not null default now(),
@@ -171,6 +186,8 @@ create index if not exists offers_customer_idx on insurance_offers (customer_id)
 create index if not exists cases_customer_idx on cases (customer_id);
 create index if not exists attempts_document_idx
     on verification_attempts (document_number, created_at desc);
+create index if not exists confirmations_customer_idx
+    on identity_confirmations (customer_id, created_at desc);
 create index if not exists audit_at_idx on audit_log (at desc);
 
 alter table customers enable row level security;
@@ -184,6 +201,7 @@ alter table proposals enable row level security;
 alter table cases enable row level security;
 alter table verification_sessions enable row level security;
 alter table verification_attempts enable row level security;
+alter table identity_confirmations enable row level security;
 alter table audit_log enable row level security;
 alter table registry_merchants enable row level security;
 

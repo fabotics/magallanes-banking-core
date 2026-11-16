@@ -25,6 +25,7 @@ TABLES = [
     "cases",
     "verification_sessions",
     "verification_attempts",
+    "identity_confirmations",
     "audit_log",
     "registry_merchants",
 ]
