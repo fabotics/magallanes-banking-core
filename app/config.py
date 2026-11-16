@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     supabase_secret_key: str = ""
     bank_api_key: str = ""
     public_base_url: str = "http://localhost:8000"
+    demo_customer_email: str = ""
 
 
 @lru_cache
