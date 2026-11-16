@@ -7,7 +7,7 @@
   {% block refresh %}{% endblock %}
   <title>Banco Magallanes | {% block title %}App{% endblock %}</title>
   {% include "app/_style.html" %}
-  <style>{% block style %}{% endblock %}</style>
+  <style id="page-style">{% block style %}{% endblock %}</style>
 </head>
 <body>
 <div class="device">
@@ -29,6 +29,8 @@
     </nav>
   </header>
   <div class="scroll">
+    {# What must outlive a change of page lives here: see `assistant.html`. #}
+    {% block keep %}{% endblock %}
     <main>
       {% block content %}{% endblock %}
     </main>
@@ -41,7 +43,7 @@
       {{ t.tab_home }}
     </a>
     {% if assistant %}
-    <a href="/app/assistant"{% if tab == "assistant" %} aria-current="page"{% endif %}>
+    <a href="/app/assistant" data-talk{% if tab == "assistant" %} aria-current="page"{% endif %}>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-6l-4.5 3.5V16H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z"/><path d="M8.5 10.5h7"/></svg>
       {{ t.tab_assistant }}
     </a>

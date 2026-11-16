@@ -53,8 +53,18 @@ def find_customer(repository: Repository, document: str, body: VerifyRequest) ->
 def open_session(
     repository: Repository, customer: Row, conversation_id: str | None, now: datetime
 ) -> str:
-    """Open a 15 minute session for a verified customer and return its token."""
+    """Open a 15 minute session for a verified customer and return its token.
+
+    A conversation has one verified customer. A new verification in the same
+    conversation ends the sessions opened earlier in it, so from then on only
+    the latest customer can be acted for.
+    """
     token = secrets.token_urlsafe(32)
+    if conversation_id:
+        earlier = repository.select("verification_sessions", {"conversation_id": conversation_id})
+        for session in earlier:
+            ended = {"expires_at": now.isoformat()}
+            repository.update("verification_sessions", {"token": session["token"]}, ended)
     repository.insert(
         "verification_sessions",
         {

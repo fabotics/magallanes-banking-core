@@ -1,0 +1,71 @@
+{# Moving around the app without ending the conversation.
+
+   A normal link loads a new page, and a new page would close the call. So once the
+   Assistant view is open, links and forms inside the app are fetched instead, and only
+   the parts of the page that differ are replaced: the content, the language links, the
+   page's own styles and the title. The conversation is never touched. Signing out and
+   changing language still load a new page, and so does a session that ran out. #}
+<script>
+  const keep = document.getElementById("keep");
+  const parts = ["main", "nav.langs", "#page-style"];
+  let reload = 0;
+
+  function place(page) {
+    // Put the fetched page in place of the current one, except for the conversation.
+    for (const part of parts) {
+      document.querySelector(part).innerHTML = page.querySelector(part).innerHTML;
+    }
+    // The menu stays as it is, so the Assistant tab is on every page. Only its mark moves.
+    const current = page.querySelector("nav.tabs a[aria-current]");
+    for (const tab of document.querySelectorAll("nav.tabs a")) {
+      const here = current && tab.pathname === new URL(current.href, location.href).pathname;
+      tab.toggleAttribute("aria-current", Boolean(here));
+    }
+    document.title = page.title;
+    document.documentElement.lang = page.documentElement.lang;
+    keep.classList.toggle("away", !page.getElementById("keep"));
+    document.querySelector(".scroll").scrollTop = 0;
+    window.scrollTo(0, 0);
+    // A page's own script is run by hand, and a page that refreshes itself is fetched again.
+    for (const script of page.querySelectorAll("script[data-page]")) {
+      new Function(script.textContent)();
+    }
+    clearTimeout(reload);
+    const again = page.querySelector('meta[http-equiv="refresh"]');
+    if (again) reload = setTimeout(() => go(location.href, {}, false), again.content * 1000);
+  }
+
+  async function go(address, request, remember = true) {
+    const response = await fetch(address, request);
+    const page = new DOMParser().parseFromString(await response.text(), "text/html");
+    // A page without the menu is the sign-in screen: the session ran out.
+    if (!page.querySelector("nav.tabs")) return location.assign(response.url);
+    if (remember) history.pushState(null, "", response.url);
+    place(page);
+  }
+
+  document.addEventListener("click", (event) => {
+    const link = event.target.closest("a");
+    if (!link || link.target || link.origin !== location.origin || link.closest(".langs")) return;
+    if (link.pathname !== "/app" && !link.pathname.startsWith("/app/")) return;
+    event.preventDefault();
+    go(link.href, {});
+  });
+
+  document.addEventListener("submit", (event) => {
+    const address = new URL(event.target.action);
+    if (address.pathname === "/app/logout") return;
+    event.preventDefault();
+    const body = new URLSearchParams(new FormData(event.target, event.submitter));
+    go(address.href, { method: "POST", body });
+  });
+
+  window.addEventListener("popstate", () => go(location.href, {}, false));
+
+  // Mark the Assistant tab while a conversation is open, so it can be found again.
+  setInterval(() => {
+    const inside = document.getElementById("widget").contentDocument;
+    const open = Boolean(inside && inside.body && inside.body.classList.contains("open"));
+    document.querySelector("nav.tabs").classList.toggle("talking", open);
+  }, 1000);
+</script>

@@ -1,30 +1,27 @@
 {% extends "app/base.html" %}
 {% block title %}{{ t.assistant_title }}{% endblock %}
 {% block style %}
-    /* The view is the frame with the widget: it fills the space between header and menu. */
-    main { position: relative; padding: 0; min-height: 26rem; }
-    .fineprint { display: none; }
-    #widget { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
-    /* What the assistant sends lies on top of the conversation, so it can be answered. */
-    #live { position: absolute; inset: 0 0 auto; z-index: 2; padding: 0 1.15rem; }
-    #live .card { border-color: var(--copper); background: var(--copper-soft);
-                  box-shadow: 0 14px 28px -14px rgba(11, 37, 48, .7); }
-    #live .code { background: #fff; margin: .7rem 0; font-size: 1.8rem;
-                  padding: .8rem 0 .8rem .28em; }
+    /* On this page the view belongs to the conversation: the page itself has nothing to show. */
+    main, .fineprint { display: none; }
+    .scroll { min-height: 26rem; }
 {% endblock %}
-{% block content %}
-  <iframe id="widget" src="/app/assistant/widget?lang={{ lang }}" title="{{ t.assistant_heading }}"
-          allow="microphone; autoplay; clipboard-write"></iframe>
-  {# Requests from the assistant show up here, so the customer answers without leaving the page. #}
-  <div id="live" aria-live="polite"
-       data-confirm="{{ t.live_confirm }}" data-hint="{{ t.confirm_code_hint }}"
-       data-approve="{{ t.approve }}" data-deny="{{ t.deny }}" data-proposal="{{ t.live_proposal }}"
-       data-sign="{{ t.read_and_sign }}" data-month="{{ t.per_month }}"></div>
+{% block keep %}
+  {# The conversation and what the assistant sends. This block is never replaced while the
+     customer moves between pages, so a call or a chat goes on: see `_stay.html`. #}
+  <div id="keep">
+    <iframe id="widget" src="/app/assistant/widget?lang={{ lang }}"
+            title="{{ t.assistant_heading }}" allow="microphone; autoplay; clipboard-write"></iframe>
+    <div id="live" aria-live="polite"
+         data-confirm="{{ t.live_confirm }}" data-hint="{{ t.confirm_code_hint }}"
+         data-approve="{{ t.approve }}" data-deny="{{ t.deny }}"
+         data-proposal="{{ t.live_proposal }}" data-sign="{{ t.read_and_sign }}"
+         data-month="{{ t.per_month }}"></div>
+  </div>
 {% endblock %}
 {% block script %}
 <script>
-  // Ask every three seconds what is waiting for the customer and draw it. The page is never
-  // reloaded, because that would end the conversation.
+  // Ask every three seconds what is waiting for the customer and draw it on top of the
+  // conversation. The page is never reloaded, because that would end the conversation.
   const live = document.getElementById("live");
   const words = live.dataset;
   let drawn = "";
@@ -64,7 +61,6 @@
       card.append(element("p", `${item.name} · ${item.premium} ${words.month}`, "muted small"));
       const link = element("a", words.sign, "button");
       link.href = `/app/proposals/${item.number}`;
-      link.target = "_blank";
       card.append(link);
       live.append(card);
     }
@@ -83,4 +79,5 @@
   refresh();
   setInterval(refresh, 3000);
 </script>
+{% include "app/_stay.html" %}
 {% endblock %}

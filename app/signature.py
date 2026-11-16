@@ -7,7 +7,7 @@ gets the details in writing, and each step leaves an audit row.
 """
 
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app import audit, notices, quotes
 from app.clock import bank_date, parse_time
@@ -17,15 +17,21 @@ from app.email import send_email
 from app.formatting import long_date
 from app.messaging import send_telegram
 
-PROPOSAL_LIFETIME = timedelta(days=14)
+# The same as a quote, so the customer hears one deadline.
+PROPOSAL_LIFETIME = quotes.QUOTE_LIFETIME
 
 
 def proposal_status(proposal: Row, now: datetime) -> str:
-    """Return pending, signed or expired. A proposal can be signed for 14 days."""
+    """Return pending, signed or expired. A proposal can be signed for as long as a quote."""
     if proposal["status"] == "signed":
         return "signed"
     expired = parse_time(proposal["created_at"]) + PROPOSAL_LIFETIME <= now
     return "expired" if expired or proposal["status"] == "expired" else "pending"
+
+
+def last_day(proposal: Row) -> str:
+    """Return the last date, at the bank, on which the proposal can be signed, as ISO."""
+    return bank_date(parse_time(proposal["created_at"]) + PROPOSAL_LIFETIME).isoformat()
 
 
 def policy_for(repository: Repository, proposal: Row) -> Row | None:

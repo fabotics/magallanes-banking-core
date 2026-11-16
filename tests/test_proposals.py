@@ -55,17 +55,18 @@ def test_the_signing_link_goes_to_the_chat_with_product_and_premium(
     assert f"next=/app/proposals/{proposal['proposal_number']}" in text
     assert proposal["signing_url"] not in text
     assert "Protección de tarjeta y asistencia" in text and "$10.790" in text
-    # Asking again returns the same proposal and sends nothing new.
+    # Asking again returns the same proposal and sends it to the customer again.
     offer_id = repository.select("insurance_offers")[0]["id"]
     again = client.post(PROPOSALS, json={"offer_id": offer_id}, headers=marta).json()
-    assert again["proposal_number"] == proposal["proposal_number"] and len(telegram) == 1
+    assert again["proposal_number"] == proposal["proposal_number"] and len(telegram) == 2
+    assert again["message_sent"] is True and telegram[1]["json"]["text"] == text
 
 
-def test_details_only_send_no_link_to_the_chat(
+def test_asking_for_the_details_sends_the_link_to_the_chat_too(
     client: TestClient, marta: dict, with_bot: None, telegram: list[dict]
 ) -> None:
-    assert send(client, marta, "info_requested")["message_sent"] is False
-    assert telegram == []
+    assert send(client, marta, "info_requested")["message_sent"] is True
+    assert len(telegram) == 1
 
 
 def test_signing_gives_the_policy_number_and_start_date(
@@ -122,11 +123,11 @@ def test_sent_viewed_and_signed_are_audited_once_each(
     assert proposal["signing_url"].rsplit("/", 1)[1] not in str(repository.select("audit_log"))
 
 
-def test_a_proposal_expires_after_14_days(
+def test_a_proposal_expires_when_its_quote_would(
     client: TestClient, repository: InMemoryRepository, marta: dict
 ) -> None:
     proposal = send(client, marta)
-    old = (utc_now() - timedelta(days=14, minutes=1)).isoformat()
+    old = (utc_now() - timedelta(days=15, minutes=1)).isoformat()
     repository.update(
         "proposals", {"proposal_number": proposal["proposal_number"]}, {"created_at": old}
     )
