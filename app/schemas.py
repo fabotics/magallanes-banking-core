@@ -131,3 +131,14 @@ class CaseResponse(BaseModel):
     queue: str
     sla_hours: int
     callback_window: str | None = None
+
+
+class Merchant(BaseModel):
+    """The business behind a merchant tax ID, as the public registry knows it."""
+
+    tax_id: str
+    legal_name: str
+    trade_name: str
+    activity: str
+    address: str
+    commune: str

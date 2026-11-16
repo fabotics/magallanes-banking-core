@@ -17,18 +17,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.config import get_settings  # noqa: E402
 from app.db import Repository, build_repository  # noqa: E402
-from seed.data import TABLES, build_seed  # noqa: E402
-
-
-def key_column(table: str) -> str:
-    """Return the primary key column of a table."""
-    return "code" if table == "insurance_products" else "id"
+from seed.data import PRIMARY_KEYS, TABLES, build_seed  # noqa: E402
 
 
 def reset(repository: Repository, demo_email: str) -> None:
     """Delete all rows, children first, then insert the seed rows, parents first."""
     for table in reversed(TABLES):
-        repository.delete_all(table, key_column(table))
+        repository.delete_all(table, PRIMARY_KEYS.get(table, "id"))
     for table, rows in build_seed(demo_email=demo_email).items():
         repository.insert_many(table, rows)
 

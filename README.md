@@ -40,7 +40,7 @@ A language model follows a prompt most of the time. A bank needs rules that hold
   Postgres on Supabase (row level security on every table)
 ```
 
-Stack: Python 3.12, FastAPI, Postgres on Supabase through the `supabase` client, Jinja2 for the signature page, pytest and ruff. Hosted as a single serverless function.
+Stack: Python 3.12, FastAPI, Postgres on Supabase through the `supabase` client, Jinja2 for the signature page, the MCP Python SDK for the merchant lookup tool, pytest and ruff. Hosted as a single serverless function.
 
 All database access goes through one small repository interface in `app/db.py`. The tests replace it with an in-memory version loaded with the same seed data, so they need no network.
 
@@ -53,12 +53,13 @@ app/
   db.py                repository: every database call
   errors.py            one error shape: {"error", "message"}
   email.py             optional proposal email
+  mcp_server.py        MCP endpoint with the merchant lookup tool
   schemas.py, schemas_insurance.py
-  routers/             identity, customers, accounts, cards, cases, insurance, signing
+  routers/             identity, customers, accounts, cards, cases, insurance, registry, signing
   templates/sign.html  signature page
 db/schema.sql          tables, checks, indexes, row level security
 seed/                  fictional customers and transactions, dated relative to today
-scripts/               seed.py, smoke_test.py
+scripts/               seed.py, smoke_test.py, mcp_check.py
 tests/                 one file per area, plus the in-memory repository
 ```
 
@@ -78,6 +79,7 @@ tests/                 one file per area, plus the in-memory repository
 | `verification_sessions` | Proof that identity was verified, with an expiry |
 | `verification_attempts` | Used by the lockout rule |
 | `audit_log` | One row per API call: endpoint, customer, conversation, outcome |
+| `registry_merchants` | Stand-in for the public company registry: the business behind a merchant tax ID |
 
 Row level security is enabled on every table with no policies, so only the server-side key can read or write.
 
@@ -97,7 +99,9 @@ Interactive documentation is served at `/docs`.
 | GET `/v1/insurance/eligibility` | yes | Products the bank pre-approves, or the reason there are none |
 | POST `/v1/insurance/offers` | yes | Record an offer and the answer: accepted, declined, info_requested |
 | POST `/v1/insurance/proposals` | yes | Create the proposal for an offer. Accepted offers get a signing link |
+| GET `/v1/registry/merchants/{tax_id}` | no | The business behind a merchant tax ID |
 | GET, POST `/sign/{token}` | no | Signature page. Signing creates the policy |
+| POST `/mcp` | no | MCP server with one tool, `lookup_merchant`. Same key, in `X-API-Key` or as a bearer token |
 
 The session token goes in the `X-Session-Token` header (preferred). It is also accepted as a `session_token` query parameter on GET and as a `session_token` body field on POST.
 
@@ -196,10 +200,28 @@ Each endpoint maps to one webhook tool on any agent platform that can call HTTP 
 - `transactions` waits about one second before answering, like a legacy system would. Have the agent say something while it waits.
 - When `eligibility` answers `eligible: false`, the agent makes no offer. When `verify` answers `locked: true`, the agent opens a handoff case.
 
+### Merchant lookup over MCP
+
+The merchant registry is also offered as an MCP tool, for platforms that connect to MCP servers.
+
+| Setting | Value |
+| --- | --- |
+| URL | `<base url>/mcp` |
+| Transport | Streamable HTTP, stateless, JSON responses |
+| Authentication | `BANK_API_KEY` as a bearer token, or in the `X-API-Key` header |
+| Tool | `lookup_merchant(tax_id)` returns `found`, `trade_name`, `legal_name`, `category` and `city` |
+
+An unknown tax ID answers `found: false` with a message, not an error. The core banking endpoints stay on plain REST on purpose: only public reference data is exposed over MCP.
+
+Each request builds its own MCP server and shuts it down when the answer is sent, so the endpoint does not rely on a startup hook and works on serverless hosting.
+
+```bash
+python scripts/mcp_check.py --base-url http://localhost:8000
+```
+
 ## Roadmap
 
 - Call summary sent to the customer's messaging channel after the conversation.
-- Merchant registry: look up the business behind a tax ID, over REST and as an MCP tool.
 - CRM sync for cases and opportunities.
 - Operations dashboard on the audit, offers and cases tables.
 - Proposal expiry.
