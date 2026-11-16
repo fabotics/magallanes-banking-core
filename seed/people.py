@@ -66,17 +66,22 @@ def country_of(key: str) -> str:
     return next(person[6] for person in PEOPLE if person[0] == key)
 
 
-def build_customers(demo_email: str = "") -> list[dict]:
-    """Build the customer rows. The golden-path customer gets `demo_email` when given."""
+def build_customers(demo_email: str = "", demo_chat_id: str = "") -> list[dict]:
+    """Build the customer rows.
+
+    The golden-path customer gets the demo email and Telegram chat when given,
+    so proposals and call summaries reach a real inbox during a demo.
+    """
     rows = []
     for key, doc_type, doc_number, first, last, birth, country, language, segment, weak in PEOPLE:
         email = f"{key}.{last.split()[0].lower()}@example.com"
         if key == "marta" and demo_email:
             email = demo_email
+        chat_id = demo_chat_id if key == "marta" and demo_chat_id else None
         rows.append({
             "id": seed_id(f"customer/{key}"), "document_type": doc_type,
             "document_number": doc_number, "first_name": first, "last_name": last,
-            "birth_date": birth, "email": email, "phone": None, "telegram_chat_id": None,
+            "birth_date": birth, "email": email, "phone": None, "telegram_chat_id": chat_id,
             "country": country, "preferred_language": language, "segment": segment,
             "is_vulnerable": weak,
         })  # fmt: skip

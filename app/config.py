@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     transactions_delay_seconds: float = 1.0
     resend_api_key: str = ""
     email_from: str = "Banco Magallanes <onboarding@resend.dev>"
+    telegram_bot_token: str = ""
+    demo_telegram_chat_id: str = ""
 
 
 @lru_cache
