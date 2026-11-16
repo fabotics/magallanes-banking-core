@@ -26,16 +26,22 @@ from app.schemas_insurance import (
 )
 from app.security import require_session, session_from_request
 
+# The insurance catalog is priced and approved for the pilot market only.
+PILOT_COUNTRY = "CL"
+
 router = APIRouter(tags=["insurance"])
 
 
 def eligible_products(repository: Repository, customer: Row) -> tuple[list[Row], str | None]:
     """Return the products the customer may be offered, or the reason there are none.
 
-    Vulnerable customers are never offered a product here: they go to a human
-    advisor. Otherwise a product qualifies when it is active, open to the
-    customer's segment, and not already held.
+    The catalog exists in the pilot country only. Vulnerable customers are
+    never offered a product here: they go to a human advisor. Otherwise a
+    product qualifies when it is active, open to the customer's segment, and
+    not already held.
     """
+    if customer["country"] != PILOT_COUNTRY:
+        return [], "not_available_in_country"
     if customer["is_vulnerable"]:
         return [], "vulnerable_customer"
     policies = repository.select("policies", {"customer_id": customer["id"], "status": "active"})
