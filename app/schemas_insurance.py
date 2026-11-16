@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class OfferedProduct(BaseModel):
@@ -34,11 +34,31 @@ class OfferRequest(BaseModel):
     """Record that a product was offered and what the customer answered."""
 
     product_code: str
-    customer_response: Literal["accepted", "declined", "info_requested"]
+    outcome: Literal["sent", "interested", "declined"] | None = Field(
+        default=None,
+        description="How the offer ended. sent: the customer wants the proposal. interested: "
+        "they want to read it before deciding. declined: they said no.",
+    )
+    loss_reason: Literal["not_interested", "price", "already_insured", "other"] | None = Field(
+        default=None, description="Only with declined: why, as the customer put it."
+    )
+    customer_response: Literal["accepted", "declined", "info_requested"] | None = Field(
+        default=None, description="The older way to say the same. Use `outcome` instead."
+    )
     conversation_id: str | None = None
     session_token: str | None = Field(
         default=None, description="Only if the X-Session-Token header is not used."
     )
+
+    @model_validator(mode="after")
+    def has_an_answer(self) -> "OfferRequest":
+        """Fill the stored answer from `outcome`. A request with neither is refused."""
+        stored = {"sent": "accepted", "interested": "info_requested", "declined": "declined"}
+        if self.outcome:
+            self.customer_response = stored[self.outcome]
+        if not self.customer_response:
+            raise ValueError("Send outcome: sent, interested or declined.")
+        return self
 
 
 class OfferResponse(BaseModel):

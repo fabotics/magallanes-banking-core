@@ -14,7 +14,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request
 
-from app import audit, notices, quotes, signature, waiting
+from app import audit, crm_sync, notices, quotes, signature, waiting
 from app.app_session import app_link
 from app.clock import bank_date, parse_time, utc_now
 from app.config import Settings, get_settings
@@ -105,6 +105,12 @@ def create_proposal(
     email_sent = send_email(settings, customer["email"], subject, html)
     message_sent = send_to_messaging(settings, customer, product, proposal, language)
 
+    if not existing:
+        number = proposal["proposal_number"]
+        copied = crm_sync.stage_changed(
+            settings, offer["id"], "Proposal Sent", Proposal_Number__c=number
+        )
+        crm_sync.noted(request, copied)
     audit.note(
         request,
         outcome="proposal_sent_again" if existing else "proposal_sent",

@@ -8,8 +8,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request
 
-from app import audit, quotes
+from app import audit, crm_sync, quotes
 from app.clock import bank_date, parse_time, utc_now
+from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.errors import ApiError
 from app.schemas_insurance import (
@@ -77,9 +78,13 @@ def log_offer(
     body: OfferRequest,
     request: Request,
     repository: Annotated[Repository, Depends(get_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
     x_session_token: Annotated[str | None, Header()] = None,
 ) -> OfferResponse:
-    """Store one offer and the customer's answer. This row is the consent record."""
+    """Store one offer and the customer's answer. This row is the consent record.
+
+    The offer is then copied to the CRM, with the reason when the answer was no.
+    """
     session = require_session(request, repository, x_session_token or body.session_token)
     customer = session_customer(repository, session)
     products, _ = eligible_products(repository, customer)
@@ -100,4 +105,11 @@ def log_offer(
         },
     )
     audit.note(request, outcome=f"offer_{body.customer_response}", product=body.product_code)
+    priced = quotes.priced(repository, chosen[0], quote["quote_number"])
+    valid_until = bank_date(parse_time(quote["valid_until"]))
+    reason = body.loss_reason or "other"
+    copied = crm_sync.offer_logged(settings, customer, offer, priced, valid_until, reason)
+    crm_sync.noted(request, copied)
+    if body.loss_reason:
+        audit.note(request, loss_reason=body.loss_reason)
     return OfferResponse(offer_id=offer["id"], logged_at=offer["created_at"])
