@@ -70,7 +70,7 @@ def build_seed(today: date | None = None, demo_email: str = "") -> dict[str, lis
     rows: dict[str, list[dict]] = {table: [] for table in TABLES}
     rows["insurance_products"] = [dict(product) for product in PRODUCTS]
     rows["customers"] = build_customers(demo_email)
-    rows["accounts"] = build_accounts(now_iso=at(today, 6, 0))
+    rows["accounts"] = build_accounts(now_iso=at(today, 0, 0))
     rows["cards"] = build_cards(blocked_at_iso=at(today - timedelta(days=3), 16, 20))
     rows["transactions"] = build_transactions(today)
     rows["policies"] = [
