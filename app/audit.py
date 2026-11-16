@@ -1,4 +1,4 @@
-"""Audit trail: one `audit_log` row for every `/v1` call.
+"""Audit trail: one `audit_log` row for every `/v1` and `/mcp` call.
 
 Endpoints describe what happened with `note(...)`. The middleware writes the
 row after the response is ready. Secrets, session tokens and full document
@@ -17,6 +17,9 @@ from app.clock import utc_now
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+# Paths that need the API key. Calls to them are recorded.
+AUDITED_PREFIXES = ("/v1", "/mcp")
 
 
 def note(
@@ -73,7 +76,7 @@ async def audit_middleware(
 ) -> Response:
     """Run the request, then record it. A failed audit write never breaks the response."""
     response = await call_next(request)
-    if request.url.path.startswith("/v1"):
+    if request.url.path.startswith(AUDITED_PREFIXES):
         row = build_row(request, response.status_code)
         try:
             repository = db.repository_for(request.app, get_settings())

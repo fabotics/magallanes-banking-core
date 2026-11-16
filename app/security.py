@@ -18,20 +18,41 @@ from app.db import Repository, Row, get_repository
 from app.errors import ApiError
 
 
-def require_api_key(
-    settings: Annotated[Settings, Depends(get_settings)],
-    x_api_key: Annotated[str | None, Header()] = None,
-) -> None:
-    """Reject the request with HTTP 401 unless `X-API-Key` matches the configured key.
+def api_key_matches(settings: Settings, provided: str | None) -> bool:
+    """Compare a key with the configured one.
 
     If no key is configured the check fails closed: nothing gets through.
     `secrets.compare_digest` compares in constant time, so the response time
     does not reveal how many characters of a guess were right.
     """
     expected = settings.bank_api_key
-    provided = x_api_key or ""
-    if not expected or not secrets.compare_digest(provided.encode(), expected.encode()):
+    if not expected or not provided:
+        return False
+    return secrets.compare_digest(provided.encode(), expected.encode())
+
+
+def require_api_key(
+    settings: Annotated[Settings, Depends(get_settings)],
+    x_api_key: Annotated[str | None, Header()] = None,
+) -> None:
+    """Reject the request with HTTP 401 unless `X-API-Key` matches the configured key."""
+    if not api_key_matches(settings, x_api_key):
         raise ApiError(401, "invalid_api_key", "Missing or invalid X-API-Key header.")
+
+
+def require_api_key_or_bearer(
+    settings: Annotated[Settings, Depends(get_settings)],
+    x_api_key: Annotated[str | None, Header()] = None,
+    authorization: Annotated[str | None, Header()] = None,
+) -> None:
+    """Like `require_api_key`, but also accepts the key as `Authorization: Bearer <key>`.
+
+    Some MCP clients only offer a bearer token field.
+    """
+    scheme, _, token = (authorization or "").partition(" ")
+    bearer = token.strip() if scheme.lower() == "bearer" else None
+    if not api_key_matches(settings, x_api_key or bearer):
+        raise ApiError(401, "invalid_api_key", "Missing or invalid API key.")
 
 
 def find_session(repository: Repository, token: str | None) -> Row | None:
