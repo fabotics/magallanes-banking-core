@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from app import audit, confirmations, waiting
+from app import audit, confirmations, crm_sync, waiting
 from app.clock import utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, get_repository
@@ -84,6 +84,7 @@ def confirmation_status(
     request_id: uuid.UUID,
     request: Request,
     repository: Annotated[Repository, Depends(get_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
     wait: waiting.Wait = 0,
 ) -> PushStatusResponse:
     """Say where the confirmation stands. Once approved, hand over the session.
@@ -116,6 +117,7 @@ def confirmation_status(
         # The first read after the approval opens the session. Later reads return the same one.
         token = open_session(repository, customer, confirmation["conversation_id"], now)
         repository.update(confirmations.TABLE, {"id": confirmation["id"]}, {"session_token": token})
+        crm_sync.noted(request, crm_sync.customer_verified(settings, customer))
     return PushStatusResponse(
         status="approved", session_token=token, first_name=customer["first_name"]
     )

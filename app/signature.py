@@ -9,7 +9,7 @@ gets the details in writing, and each step leaves an audit row.
 import secrets
 from datetime import datetime
 
-from app import audit, notices, quotes
+from app import audit, crm_sync, notices, quotes
 from app.clock import bank_date, parse_time
 from app.config import Settings
 from app.db import Repository, Row
@@ -87,6 +87,11 @@ def sign(
         **evidence,
     )  # fmt: skip
     confirm_in_writing(repository, settings, policy, proposal, evidence.get("language"))
+    # The sale is closed in the CRM too, on the day of the signature.
+    crm_sync.stage_changed(
+        settings, proposal["offer_id"], "Closed Won",
+        Policy_Number__c=policy["policy_number"], CloseDate=bank_date(now).isoformat(),
+    )  # fmt: skip
     return policy
 
 
