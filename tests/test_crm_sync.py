@@ -48,6 +48,8 @@ def verified(client: TestClient) -> dict:
 
 
 def log_offer(client: TestClient, session: dict, **answer: str) -> str:
+    # The customer hears their price first: a yes cannot be recorded before the quote.
+    client.get("/v1/insurance/eligibility", headers=session)
     body = {"product_code": "CARD_FRAUD", **answer}
     return client.post("/v1/insurance/offers", json=body, headers=session).json()["offer_id"]
 
@@ -68,13 +70,15 @@ def test_the_whole_sale_is_mirrored_stage_by_stage(
     offer_id = log_offer(client, session, outcome="sent")
     lead = next(body for _, path, body in sent if path.startswith("/sobjects/Lead/"))
     assert lead["Company"] == "Protección de tarjeta y asistencia"
-    (offered,) = opportunity_changes(sent, offer_id)
+    # Recording a yes also sends the proposal, so the sale is already one stage further.
+    offered, proposal_sent = opportunity_changes(sent, offer_id)
+    assert proposal_sent["StageName"] == "Proposal Sent"
     quote = repository.select("quotes")[0]
     assert offered["StageName"] == "Offered" and offered["Amount"] == 10790 * 12
     assert (
         offered["CloseDate"] <= quote["valid_until"][:10] and offered["LeadSource"] == "Voice agent"
     )
-    assert ("POST", "/sobjects/OpportunityContactRole") == sent[-1][:2]
+    assert ("POST", "/sobjects/OpportunityContactRole") in [call[:2] for call in sent]
     # What a card of the board shows: who, how much a month, which quote, and when.
     assert (
         offered["Contact_Name__c"] == "Marta Rojas Fuentes"
@@ -115,7 +119,8 @@ def test_the_outcome_is_stored_as_the_answer_and_the_old_field_still_works(
         ({"outcome": "interested"}, "info_requested"),
         ({"customer_response": "declined"}, "declined"),
     ):
-        offer_id = log_offer(client, marta, **answer)
+        # One conversation each: within one, a second yes returns the first offer.
+        offer_id = log_offer(client, marta, conversation_id=stored, **answer)
         row = repository.select("insurance_offers", {"id": offer_id})[0]
         assert row["customer_response"] == stored
     nothing = client.post(
@@ -137,7 +142,8 @@ def test_a_crm_that_fails_changes_no_answer(
     proposal = client.post("/v1/insurance/proposals", json=body, headers=session)
     assert proposal.status_code == 200 and proposal.json()["proposal_number"].startswith("PR-")
     rows = [row["detail"].get("crm") for row in repository.select("audit_log")]
-    assert rows.count("failed") == 3 and "ok" not in rows
+    # The verification and the offer (which now also sends the proposal) each noted a failure.
+    assert rows.count("failed") == 2 and "ok" not in rows
 
 
 def test_without_a_crm_nothing_is_sent_or_noted(

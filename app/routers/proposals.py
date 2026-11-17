@@ -78,6 +78,23 @@ def create_proposal(
         raise ApiError(409, "offer_declined", "The customer declined this offer.")
 
     customer = repository.select("customers", {"id": session["customer_id"]})[0]
+    return issue(request, repository, settings, customer, offer, body.language)
+
+
+def issue(
+    request: Request,
+    repository: Repository,
+    settings: Settings,
+    customer: Row,
+    offer: Row,
+    asked_language: str | None,
+) -> ProposalResponse:
+    """Create the proposal of an offer if it has none, send it, and return it.
+
+    Used when a proposal is asked for, and when an offer is recorded as wanted:
+    the bank sends the proposal in that same step, so the customer does not
+    wait through a second request.
+    """
     existing = repository.select("proposals", {"offer_id": offer["id"]})
     if existing:
         proposal = existing[0]
@@ -98,7 +115,7 @@ def create_proposal(
             },
         )
     link = signing_link(settings, proposal)
-    language = notices.language_for(customer, body.language)
+    language = notices.language_for(customer, asked_language)
     product = quotes.for_proposal(repository, proposal)
     subject = f"Banco Magallanes: {notices.priced(product, language)[0]}"
     html = notices.proposal_email(product, signing_link(settings, proposal, language), language)
