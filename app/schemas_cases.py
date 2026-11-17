@@ -79,9 +79,10 @@ class ReviewRequest(BaseModel):
 
     model_config = ConfigDict(json_schema_extra={"example": {"outcome": "recognised"}})
 
-    outcome: Literal["recognised", "not_recognised"] = Field(
+    outcome: Literal["recognised", "not_recognised", "wants_person"] = Field(
         description="recognised: the charges are theirs. not_recognised: they said, after the "
-        "explanation, that the charges are not theirs. A doubt or a question is neither."
+        "explanation, that the charges are not theirs. wants_person: they asked, in words, to "
+        "talk to a person. A doubt or a question is none of these."
     )
     session_token: str | None = Field(
         default=None, description="Only if the X-Session-Token header is not used."
@@ -89,9 +90,15 @@ class ReviewRequest(BaseModel):
 
 
 class ReviewResponse(BaseModel):
-    """The recorded answer and what to do next."""
+    """The recorded answer and where the conversation goes next.
+
+    The bank decides the route, from the answer and from its own rules: a
+    customer who recognises the charges and may be offered insurance goes to
+    the offer; one who may not goes to the closing.
+    """
 
     outcome: str
+    review_route: Literal["offer", "wrap_up", "fraud", "handoff"]
     next_step: str
 
 

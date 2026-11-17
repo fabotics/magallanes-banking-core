@@ -66,13 +66,22 @@ def test_an_approval_opens_the_same_session_as_the_spoken_check(
     answer(repository, request_id, approved=True)
     result = status(client, request_id)
     overview = result.pop("overview")
+    assert result.pop("review_route") == "review"
     assert result == {
         "status": "approved",
         "session_token": result["session_token"],
         "first_name": "Marta",
     }
     assert overview["customer"]["segment"] == "preferred"
-    assert overview["charges"]["repeated_charges"][0]["total"] == 34900
+    # First what the statement shows: no merchant and no day of purchase in it.
+    (shown,), (explained,) = overview["turn_1"], overview["reveal"]
+    assert shown["total"] == 34900 and shown["posted_weekday"] == "Monday"
+    assert [line["time"] for line in shown["charges"]] == ["21:52", "22:37", "23:14", "23:58"]
+    assert "Saturday" not in str(shown) and "tax" not in str(shown)
+    # Then what explains it, for when the customer asks.
+    assert explained["purchased_on"][0].startswith("Saturday ")
+    assert explained["merchant_tax_id"] == "66871234-7"
+    assert "post a day or two later" in explained["why_the_dates_differ"]
     headers = {**API_KEY, "X-Session-Token": result["session_token"]}
     assert client.get("/v1/customers/me", headers=headers).status_code == 200
     # Asking again returns the same session instead of opening a second one.
