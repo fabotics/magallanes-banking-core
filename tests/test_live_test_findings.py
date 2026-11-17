@@ -310,3 +310,19 @@ def test_recording_a_yes_sends_the_proposal_in_the_same_step(
     assert again["offer_id"] == recorded["offer_id"]
     assert again["proposal_number"] == recorded["proposal_number"]
     assert len(repository.select("insurance_offers")) == 1 and len(telegram) == before + 2
+
+
+def test_a_customer_who_holds_the_cover_is_offered_nothing_else(
+    client: TestClient, repository: InMemoryRepository, marta: dict
+) -> None:
+    # What happened in a real call: the demo customer had signed in an earlier run, and
+    # the next call offered a different product. A conversation offers the card cover only.
+    customer = seed_id("customer/marta")
+    held = {"customer_id": customer, "product_code": "CARD_FRAUD", "policy_number": "PZ-TEST"}
+    started = {"proposal_id": None, "status": "active", "started_at": utc_now().isoformat()}
+    repository.insert("policies", {**held, **started})
+    assert review(client, marta, "recognised")["review_route"] == "wrap_up"
+    eligibility = client.get("/v1/insurance/eligibility", headers=marta).json()
+    assert eligibility["products"] == [] and eligibility["offer_route"] == "wrap_up"
+    other = {"product_code": "UNEMPLOYMENT", "customer_response": "accepted"}
+    assert client.post("/v1/insurance/offers", json=other, headers=marta).status_code == 409

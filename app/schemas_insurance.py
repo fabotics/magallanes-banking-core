@@ -22,6 +22,10 @@ class EligibilityResponse(BaseModel):
     """The bank's decision on what may be offered. The agent never decides this itself."""
 
     eligible: bool
+    offer_route: Literal["offer", "wrap_up"] = Field(
+        description="Where the conversation goes next: offer when there is a product to "
+        "offer, wrap_up when there is none."
+    )
     products: list[OfferedProduct]
     reason_if_not: str | None = Field(
         default=None,

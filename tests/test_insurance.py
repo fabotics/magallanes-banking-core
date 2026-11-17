@@ -33,10 +33,14 @@ def offer(client: TestClient, headers: dict, answer: str, product: str = "CARD_F
     return response.json()
 
 
-def test_eligible_customer_gets_a_choice_of_products(client: TestClient, marta: dict) -> None:
+def test_an_eligible_customer_is_offered_the_card_cover_only(
+    client: TestClient, marta: dict
+) -> None:
     body = client.get("/v1/insurance/eligibility", headers=marta).json()
     assert body["eligible"] is True and body["reason_if_not"] is None
-    assert [product["code"] for product in body["products"]] == ["CARD_FRAUD", "UNEMPLOYMENT"]
+    assert body["offer_route"] == "offer"
+    # The catalog has more, but a conversation offers one product and never another in its place.
+    assert [product["code"] for product in body["products"]] == ["CARD_FRAUD"]
     assert body["products"][0] == {
         "code": "CARD_FRAUD",
         "name": "Protección de tarjeta y asistencia",
@@ -57,7 +61,8 @@ def test_eligible_customer_gets_a_choice_of_products(client: TestClient, marta: 
 )
 def test_not_eligible_customers_get_a_reason(client: TestClient, person: str, reason: str) -> None:
     body = client.get("/v1/insurance/eligibility", headers=headers_for(client, person)).json()
-    assert body == {"eligible": False, "products": [], "reason_if_not": reason}
+    nothing = {"eligible": False, "products": [], "reason_if_not": reason, "offer_route": "wrap_up"}
+    assert body == nothing
 
 
 def test_segment_rule(client: TestClient, repository: InMemoryRepository) -> None:
@@ -73,6 +78,7 @@ def test_catalog_is_only_available_in_the_pilot_country(client: TestClient) -> N
         "eligible": False,
         "products": [],
         "reason_if_not": "not_available_in_country",
+        "offer_route": "wrap_up",
     }
     offer = {"product_code": "CARD_FRAUD", "customer_response": "accepted"}
     assert client.post("/v1/insurance/offers", json=offer, headers=headers).status_code == 409
@@ -82,7 +88,7 @@ def test_every_offer_is_stored_as_the_consent_record(
     client: TestClient, repository: InMemoryRepository, marta: dict
 ) -> None:
     declined = offer(client, marta, "declined")
-    accepted = offer(client, marta, "accepted", product="UNEMPLOYMENT")
+    accepted = offer(client, marta, "accepted")
     rows = repository.select("insurance_offers")
     assert [row["id"] for row in rows] == [declined["offer_id"], accepted["offer_id"]]
     assert [row["customer_response"] for row in rows] == ["declined", "accepted"]
@@ -174,8 +180,10 @@ def test_signing_the_proposal_creates_the_policy(
     assert repository.select("proposals")[0]["status"] == "signed"
     assert repository.select("audit_log")[-1]["outcome"] == "proposal_signed"
 
+    # She holds the cover now: nothing is offered in its place.
     eligibility = client.get("/v1/insurance/eligibility", headers=marta).json()
-    assert [product["code"] for product in eligibility["products"]] == ["UNEMPLOYMENT"]
+    assert eligibility["products"] == [] and eligibility["reason_if_not"] == "already_insured"
+    assert eligibility["offer_route"] == "wrap_up"
 
 
 def test_unknown_signing_link_is_a_404_page(client: TestClient) -> None:
