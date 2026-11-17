@@ -187,23 +187,51 @@ def test_an_approval_still_arrives_after_the_cap(
     assert answer["status"] == "approved" and "next_step" not in answer
 
 
-def test_a_doubt_is_recorded_only_as_the_customers_answer_after_the_explanation(
+def review(client: TestClient, session: dict, outcome: str) -> dict:
+    return client.post("/v1/cards/review", json={"outcome": outcome}, headers=session).json()
+
+
+def test_the_bank_decides_where_the_conversation_goes_after_the_answer(
     client: TestClient, repository: InMemoryRepository, marta: dict
 ) -> None:
-    said = client.post("/v1/cards/review", json={"outcome": "recognised"}, headers=marta).json()
-    assert said["outcome"] == "recognised" and "No block and no case" in said["next_step"]
-    no = client.post("/v1/cards/review", json={"outcome": "not_recognised"}, headers=marta).json()
-    assert "fraud case" in no["next_step"]
-    assert (
-        client.post("/v1/cards/review", json={"outcome": "unsure"}, headers=marta).status_code
-        == 422
-    )
-    assert (
-        client.post("/v1/cards/review", json={"outcome": "recognised"}, headers=API_KEY).status_code
-        == 401
-    )
+    # Recognised and eligible: the offer always comes next.
+    said = review(client, marta, "recognised")
+    assert said["review_route"] == "offer" and "offer comes next" in said["next_step"]
+    assert review(client, marta, "not_recognised")["review_route"] == "fraud"
+    assert review(client, marta, "wants_person")["review_route"] == "handoff"
+    unsure = client.post("/v1/cards/review", json={"outcome": "unsure"}, headers=marta)
+    assert unsure.status_code == 422
+    no_session = client.post("/v1/cards/review", json={"outcome": "recognised"}, headers=API_KEY)
+    assert no_session.status_code == 401
     outcomes = [row["outcome"] for row in repository.select("audit_log")]
     assert "charges_recognised" in outcomes and "charges_not_recognised" in outcomes
+
+
+@pytest.mark.parametrize(
+    ("document", "why"),
+    [
+        ("33.161.803-9", "already holds the card cover"),
+        ("34.141.421-0", "her only card is blocked"),
+        ("90000017", "the catalog is not sold in her country"),
+    ],
+)
+def test_no_offer_follows_when_the_bank_has_nothing_to_offer(
+    client: TestClient, repository: InMemoryRepository, document: str, why: str
+) -> None:
+    session = verify_in_app(client, repository, customer_id=document)
+    assert review(client, session, "recognised")["review_route"] == "wrap_up", why
+
+
+def test_a_vulnerable_customer_goes_to_a_person_right_after_verification(
+    client: TestClient, repository: InMemoryRepository
+) -> None:
+    pushed = client.post(
+        "/v1/identity/push", json={"customer_id": "30.577.215-1"}, headers=API_KEY
+    ).json()
+    row = repository.select(confirmations.TABLE, {"id": pushed["request_id"]})[0]
+    confirmations.decide(repository, row, True, utc_now())
+    answer = client.get(f"/v1/identity/push/{pushed['request_id']}", headers=API_KEY).json()
+    assert answer["review_route"] == "handoff"
 
 
 def test_a_case_opened_too_early_can_be_taken_back(

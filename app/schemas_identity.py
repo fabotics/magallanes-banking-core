@@ -77,6 +77,11 @@ class PushStatusResponse(BaseModel):
     instruction: str | None = Field(default=None, description="The same, in a sentence.")
     overview: Overview | None = Field(
         default=None,
-        description="Once approved: the profile and the recent card movements, so the caller "
+        description="Once approved: the profile and what the statement shows, so the caller "
         "does not have to ask for them.",
+    )
+    review_route: Literal["review", "handoff"] | None = Field(
+        default=None,
+        description="Once approved: where the conversation goes next. handoff for a customer "
+        "the bank serves in person.",
     )

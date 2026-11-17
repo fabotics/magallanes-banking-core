@@ -14,6 +14,7 @@ from app import audit, crm_sync
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.errors import ApiError
+from app.routers.insurance import eligible_products
 from app.schemas_cases import ReviewRequest, ReviewResponse, WithdrawResponse
 from app.security import require_session, session_from_request
 
@@ -21,10 +22,29 @@ router = APIRouter(tags=["cases"])
 WITHDRAWN = " [Retirado por el cliente: reconoció los cargos.]"
 # What the caller does next, said in a sentence so it does not have to decide.
 NEXT = {
-    "recognised": "The customer recognises the charges. No block and no case. Go on.",
-    "not_recognised": "The customer does not recognise the charges after the explanation. "
+    "offer": "The customer recognises the charges and the bank may offer them insurance. "
+    "The offer comes next.",
+    "wrap_up": "The customer recognises the charges and no offer applies. Close the conversation.",
+    "fraud": "The customer does not recognise the charges after the explanation. "
     "Propose the temporary block and the fraud case now.",
+    "handoff": "The customer asked for a person. Arrange it now.",
 }
+
+
+def route_after(repository: Repository, customer: Row, outcome: str) -> str:
+    """Return where the conversation goes after the customer's answer. The bank decides.
+
+    A customer who recognises the charges hears one insurance offer, unless
+    the bank's own rules leave nothing to offer (another country, already
+    insured, a vulnerable customer) or they have no card in use.
+    """
+    if outcome == "not_recognised":
+        return "fraud"
+    if outcome == "wants_person":
+        return "handoff"
+    cards = repository.select("cards", {"customer_id": customer["id"], "status": "active"})
+    products, _ = eligible_products(repository, customer)
+    return "offer" if cards and products else "wrap_up"
 
 
 @router.post("/cards/review", response_model=ReviewResponse)
@@ -34,10 +54,12 @@ def record_review(
     repository: Annotated[Repository, Depends(get_repository)],
     x_session_token: Annotated[str | None, Header()] = None,
 ) -> ReviewResponse:
-    """Record whether the customer recognises the charges that were explained to them."""
-    require_session(request, repository, x_session_token or body.session_token)
-    audit.note(request, outcome=f"charges_{body.outcome}")
-    return ReviewResponse(outcome=body.outcome, next_step=NEXT[body.outcome])
+    """Record the customer's answer about the charges and say where the conversation goes."""
+    session = require_session(request, repository, x_session_token or body.session_token)
+    customer = repository.select("customers", {"id": session["customer_id"]})[0]
+    route = route_after(repository, customer, body.outcome)
+    audit.note(request, outcome=f"charges_{body.outcome}", review_route=route)
+    return ReviewResponse(outcome=body.outcome, review_route=route, next_step=NEXT[route])
 
 
 @router.post("/cases/{case_number}/withdraw", response_model=WithdrawResponse)

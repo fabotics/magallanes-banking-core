@@ -4,6 +4,11 @@ One entry per release to `main`. Dates are the day the release was merged, in UT
 
 ## Unreleased
 
+## 0.22.0 (2026-11-17)
+
+- The answer to a verification is split the way the conversation goes: what the statement shows, then what explains it.
+- The bank decides where a conversation goes after the customer's answer about their charges: the offer, the closing, the fraud step or a person.
+
 ## 0.21.1 (2026-11-17)
 
 - Docs: `/docs` has an Authorize button for the API key, a description per group and an example per request body.
