@@ -29,6 +29,12 @@ def day_in_words(moment: str | None) -> str | None:
     return f"{WEEKDAYS[local.weekday()]} {long_date(local.date(), 'en')}"
 
 
+def clock_12(hour_minute: str) -> str:
+    """Write a 24 hour time the way it is said: `20:55` becomes `8:55 pm`."""
+    hour, minute = (int(part) for part in hour_minute.split(":"))
+    return f"{hour % 12 or 12}:{minute:02d} {'am' if hour < 12 else 'pm'}"
+
+
 def local_fields(row: dict) -> dict:
     """Return the moments of one movement in bank time, with the day and hour in words."""
     posted = row["posted_at"]

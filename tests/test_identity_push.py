@@ -76,7 +76,12 @@ def test_an_approval_opens_the_same_session_as_the_spoken_check(
     # First what the statement shows: no merchant and no day of purchase in it.
     (shown,), (explained,) = overview["turn_1"], overview["reveal"]
     assert shown["total"] == 34900 and shown["posted_weekday"] == "Monday"
-    assert [line["time"] for line in shown["charges"]] == ["21:52", "22:37", "23:14", "23:58"]
+    assert [line["time"] for line in shown["charges"]] == [
+        "9:52 pm",
+        "10:37 pm",
+        "11:14 pm",
+        "11:58 pm",
+    ]
     assert "Saturday" not in str(shown) and "tax" not in str(shown)
     # Then what explains it, for when the customer asks.
     assert explained["purchased_on"][0].startswith("Saturday ")

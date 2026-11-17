@@ -109,7 +109,10 @@ def statement_views(charges: TransactionsResponse) -> tuple[list[StatementView],
     for group in charges.repeated_charges:
         same = [item for item in charges.transactions if item.descriptor == group.descriptor]
         same.sort(key=lambda item: parse_time(item.transaction_at))
-        lines = [StatementCharge(time=item.purchased_time, amount=item.amount) for item in same]
+        lines = [
+            StatementCharge(time=statement.clock_12(item.purchased_time), amount=item.amount)
+            for item in same
+        ]
         posted = (group.posted_on or group.purchased_on)[-1].split()[0]
         views.append(
             StatementView(
@@ -126,8 +129,8 @@ def statement_views(charges: TransactionsResponse) -> tuple[list[StatementView],
                 descriptor=group.descriptor,
                 merchant_tax_id=group.merchant_tax_id,
                 purchased_on=group.purchased_on,
-                first_time=group.first_time,
-                last_time=group.last_time,
+                first_time=statement.clock_12(group.first_time),
+                last_time=statement.clock_12(group.last_time),
                 posted_on=group.posted_on,
                 why_the_dates_differ=WHY,
             )  # fmt: skip

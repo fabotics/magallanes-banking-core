@@ -142,6 +142,7 @@ def records(person: dict, account: str) -> tuple[dict, dict, dict]:
         "Monthly_Premium__c": person["premium"],
         "Channel__c": person["channel"],
         "Last_Activity__c": person["last_activity"].isoformat(),
+        "Last_Activity_At__c": person["touched"] or person["offered"],
         "Quote_Number__c": person["quote"],
         "Loss_Reason__c": person["reason"],
         "Proposal_Number__c": person["proposal"] if sent else None,

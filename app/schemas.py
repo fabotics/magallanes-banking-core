@@ -131,7 +131,7 @@ class TransactionsResponse(BaseModel):
 class StatementCharge(BaseModel):
     """One charge the way the statement lists it: its hour and its amount."""
 
-    time: str = Field(description="Hour it was made at the bank, 24 hour clock: 21:52.")
+    time: str = Field(description="Hour it was made at the bank, as it is said: 9:52 pm.")
     amount: float
 
 
