@@ -29,6 +29,25 @@ def normalize_document(value: str) -> str:
     return "".join(character for character in value if character.isalnum()).upper()
 
 
+def heard_document(repository: Repository, said: str) -> str:
+    """Return the ID number in something a customer said aloud, as the bank stores it.
+
+    Speech arrives with noise: `35628194@, uh, -2`. Two readings are tried.
+    The first keeps every letter and digit, which is right for an ID that has
+    letters in it. The second keeps the digits only, plus a final K, which is
+    right for a number said with fillers around it. The reading the bank knows
+    wins; if it knows neither, the digits are used when there are any.
+    """
+    exact = normalize_document(said)
+    digits = "".join(character for character in said if character.isdigit())
+    if exact.endswith("K") and digits:
+        digits += "K"
+    for reading in (exact, digits):
+        if reading and repository.select("customers", {"document_number": reading}):
+            return reading
+    return digits or exact
+
+
 def recent_failures(repository: Repository, document: str, now: datetime) -> int:
     """Count failed attempts for a document in the window, since its last success."""
     attempts = repository.select("verification_attempts", {"document_number": document})
@@ -88,7 +107,7 @@ def verify_identity(
 ) -> VerifyResponse:
     """Verify the customer and open a session. A failure never says which field was wrong."""
     now = utc_now()
-    document = normalize_document(body.document_number)
+    document = heard_document(repository, body.document_number)
     audit.note(request, conversation_id=body.conversation_id, document=audit.mask(document))
 
     failures = recent_failures(repository, document, now)

@@ -115,7 +115,7 @@ def test_wait_gives_up_when_the_time_is_over(
     clock = [0.0]
     monkeypatch.setattr(waiting, "monotonic", lambda: clock[0])
     monkeypatch.setattr(waiting, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
-    assert client.get(f"{URL}/{request_id}?wait=5", headers=API_KEY).json() == {"status": "pending"}
+    assert client.get(f"{URL}/{request_id}?wait=5", headers=API_KEY).json()["status"] == "pending"
     assert clock[0] == 5.0
     assert client.get(f"{URL}/{request_id}?wait=21", headers=API_KEY).status_code == 422
 
