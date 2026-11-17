@@ -107,9 +107,9 @@ def create_proposal(
 
     if not existing:
         number = proposal["proposal_number"]
-        copied = crm_sync.stage_changed(
-            settings, offer["id"], "Proposal Sent", Proposal_Number__c=number
-        )
+        # A customer who only wants to read it first stays Interested until they sign.
+        stage = "Proposal Sent" if offer["customer_response"] == "accepted" else "Interested"
+        copied = crm_sync.stage_changed(settings, offer["id"], stage, Proposal_Number__c=number)
         crm_sync.noted(request, copied)
     audit.note(
         request,

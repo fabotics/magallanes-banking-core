@@ -3,12 +3,15 @@
 Usage:
     python scripts/crm_setup.py
 
-It adds what the mirror needs and a fresh org does not have: the stages
-Offered and Proposal Sent, the lead source Voice agent, the custom fields
-(the external IDs the mirror finds records by, the loss reason, the proposal
-and policy numbers, and the Seeded mark of demo data), a permission set that
-lets administrators see those fields, and the list view "Voice agent funnel"
-for opportunities and leads. It uses the Metadata API, which takes XML.
+It sets up what the mirror needs and a fresh org does not have. The sales
+process becomes five stages and nothing else: Offered, Interested, Proposal
+Sent, Signed (won) and Declined (lost); the org's default stages are switched
+off. It adds the lead source Voice agent, the custom fields (the external IDs
+the mirror finds records by, what a card shows, the loss reason, and the
+Seeded mark of demo data), a permission set that lets administrators see
+those fields and lets the seed script date its records in the past, and the
+list view "Voice agent funnel" for opportunities and leads. It uses the
+Metadata API, which takes XML.
 """
 
 import re
@@ -23,7 +26,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app import crm, crm_sync  # noqa: E402
 from app.config import Settings, get_settings  # noqa: E402
 
-NEW_STAGES = (("Offered", 20), ("Proposal Sent", 60))
+# stage, probability, closed, won, forecast category. The order is the order of the funnel.
+STAGES = (
+    ("Offered", 10, False, False, "Pipeline"),
+    ("Interested", 30, False, False, "Pipeline"),
+    ("Proposal Sent", 60, False, False, "Pipeline"),
+    ("Signed", 100, True, True, "Closed"),
+    ("Declined", 0, True, False, "Omitted"),
+)
 VIEW = "Voice_agent_funnel"
 # object, field name, label, what kind of field
 FIELDS = [
@@ -36,25 +46,47 @@ FIELDS = [
     ("Opportunity", "Proposal_Number__c", "Proposal Number", "text"),
     ("Opportunity", "Policy_Number__c", "Policy Number", "text"),
     ("Opportunity", "Loss_Reason__c", "Loss Reason", "reason"),
+    ("Opportunity", "Contact_Name__c", "Contact Name", "name"),
+    ("Opportunity", "Monthly_Premium__c", "Monthly Premium (CLP)", "pesos"),
+    ("Opportunity", "Quote_Number__c", "Quote Number", "text"),
+    ("Opportunity", "Channel__c", "Channel", "channel"),
+    ("Opportunity", "Last_Activity__c", "Last Activity", "day"),
 ]
+CHANNELS = ("Phone", "App", "Telegram")
+
+
+def choices(values: tuple[str, ...]) -> str:
+    """Write a picklist that takes these values and no others."""
+    listed = "".join(
+        f"<value><fullName>{v}</fullName><default>false</default><label>{v}</label></value>"
+        for v in values
+    )
+    return (
+        "<type>Picklist</type><valueSet><restricted>true</restricted><valueSetDefinition>"
+        f"<sorted>false</sorted>{listed}</valueSetDefinition></valueSet>"
+    )
+
+
 REASONS = ("Not interested", "Price", "Already insured", "Other")
 KINDS = {
     "key": "<externalId>true</externalId><unique>true</unique><length>40</length><type>Text</type>",
     "text": "<length>20</length><type>Text</type>",
+    "name": "<length>80</length><type>Text</type>",
     "mark": "<defaultValue>false</defaultValue><type>Checkbox</type>",
-    "reason": "<type>Picklist</type><valueSet><restricted>true</restricted><valueSetDefinition>"
-    "<sorted>false</sorted>"
-    + "".join(
-        f"<value><fullName>{r}</fullName><default>false</default><label>{r}</label></value>"
-        for r in REASONS
-    )
-    + "</valueSetDefinition></valueSet>",
+    # A plain number, so the amount is not shown with the org's own currency sign.
+    "pesos": "<precision>9</precision><scale>0</scale><type>Number</type>",
+    "day": "<type>Date</type>",
+    "reason": choices(REASONS),
+    "channel": choices(CHANNELS),
 }
 # object, columns of the list view, the column the lead source is filtered on
 VIEWS = [
-    ("Opportunity", ("OPPORTUNITY.LAST_UPDATE", "OPPORTUNITY.NAME", "OPPORTUNITY.STAGE_NAME",
-                     "OPPORTUNITY.AMOUNT", "OPPORTUNITY.CLOSE_DATE", "Loss_Reason__c",
-                     "Policy_Number__c"), "OPPORTUNITY.LEAD_SOURCE", "LastModifiedDate"),
+    # The first four columns are what a card of the board shows under its title.
+    ("Opportunity", ("OPPORTUNITY.NAME", "Contact_Name__c", "Monthly_Premium__c", "Channel__c",
+                     "Last_Activity__c", "OPPORTUNITY.STAGE_NAME", "OPPORTUNITY.AMOUNT",
+                     "Quote_Number__c", "Policy_Number__c", "Loss_Reason__c",
+                     "OPPORTUNITY.CLOSE_DATE", "OPPORTUNITY.LAST_UPDATE"),
+     "OPPORTUNITY.LEAD_SOURCE", "LastModifiedDate"),
     ("Lead", ("LEAD.CREATED_DATE", "FULL_NAME", "LEAD.COMPANY", "LEAD.STATUS",
               "LEAD.LEAD_SOURCE"), "LEAD.LEAD_SOURCE", "CreatedDate"),
 ]  # fmt: skip
@@ -85,19 +117,33 @@ def item(kind: str, name: str, body: str) -> str:
     return f'<metadata xsi:type="{kind}"><fullName>{name}</fullName>{body}</metadata>'
 
 
-def add_values(settings: Settings, value_set: str, values: list[str]) -> None:
-    """Add values to a standard picklist, in front of the ones it already has."""
-    ask = f"<type>StandardValueSet</type><fullNames>{value_set}</fullNames>"
-    current = re.findall(
-        r"<standardValue>.*?</standardValue>", metadata(settings, "readMetadata", ask)
+def stage_values() -> str:
+    """Write the five stages of the sale, in the order of the funnel."""
+    written = ""
+    for name, probability, closed, won, forecast in STAGES:
+        written += (
+            f"<standardValue><fullName>{name}</fullName><default>false</default>"
+            f"<label>{name}</label><closed>{str(closed).lower()}</closed>"
+            f"<forecastCategory>{forecast}</forecastCategory>"
+            f"<probability>{probability}</probability><won>{str(won).lower()}</won>"
+            "</standardValue>"
+        )
+    return written
+
+
+def add_lead_source(settings: Settings) -> None:
+    """Add the lead source of mirrored records to the ones the org already has."""
+    ask = "<type>StandardValueSet</type><fullNames>LeadSource</fullNames>"
+    current = "".join(
+        re.findall(r"<standardValue>.*?</standardValue>", metadata(settings, "readMetadata", ask))
     )
-    new = [value for value in values if f"<fullName>{value[0]}</fullName>" not in "".join(current)]
-    added = "".join(
-        f"<standardValue><fullName>{name}</fullName>{rest}</standardValue>" for name, rest in new
-    )
-    body = "<sorted>false</sorted>" + added + "".join(current)
-    metadata(settings, "updateMetadata", item("StandardValueSet", value_set, body))
-    print(f"{value_set}: added {[name for name, _ in new] or 'nothing, all there'}")
+    if f"<fullName>{crm_sync.SOURCE}</fullName>" not in current:
+        added = (
+            f"<standardValue><fullName>{crm_sync.SOURCE}</fullName><default>false</default>"
+            f"<label>{crm_sync.SOURCE}</label></standardValue>"
+        )
+        body = f"<sorted>false</sorted>{added}{current}"
+        metadata(settings, "updateMetadata", item("StandardValueSet", "LeadSource", body))
 
 
 def main() -> None:
@@ -105,13 +151,14 @@ def main() -> None:
     settings = get_settings()
     if not crm.enabled(settings):
         sys.exit("SALESFORCE_INSTANCE_URL and SALESFORCE_CLIENT_ID are not set.")
-    stage = (
-        "<default>false</default><label>{0}</label><closed>false</closed>"
-        "<forecastCategory>Pipeline</forecastCategory><probability>{1}</probability><won>false</won>"
-    )
-    add_values(settings, "OpportunityStage", [(n, stage.format(n, p)) for n, p in NEW_STAGES])
-    source = "<default>false</default><label>Voice agent</label>"
-    add_values(settings, "LeadSource", [(crm_sync.SOURCE, source)])
+    # Only these five stages stay active: a stage that is not written here is switched off.
+    stages = f"<sorted>false</sorted>{stage_values()}"
+    metadata(settings, "updateMetadata", item("StandardValueSet", "OpportunityStage", stages))
+    print(f"stages: {[stage[0] for stage in STAGES]}")
+    add_lead_source(settings)
+    # Lets a record be created with a date in the past, for the seeded history.
+    dated = "<enableAuditFieldsInactiveOwner>true</enableAuditFieldsInactiveOwner>"
+    metadata(settings, "updateMetadata", item("SecuritySettings", "Security", dated))
     fields = [
         item("CustomField", f"{o}.{n}", f"<label>{label}</label>{KINDS[k]}")
         for o, n, label, k in FIELDS
@@ -123,7 +170,10 @@ def main() -> None:
         f"<fieldPermissions><editable>true</editable><field>{o}.{n}</field>"
         "<readable>true</readable></fieldPermissions>" for o, n, _, _ in FIELDS
     )  # fmt: skip
-    body = f"<label>Voice agent funnel</label>{allowed}"
+    past_dates = (
+        "<userPermissions><enabled>true</enabled><name>CreateAuditFields</name></userPermissions>"
+    )
+    body = f"{allowed}<label>Voice agent funnel</label>{past_dates}"
     metadata(settings, "upsertMetadata", item("PermissionSet", VIEW, body))
     allow_administrators(settings)
     for kind, columns, source_column, newest in VIEWS:
