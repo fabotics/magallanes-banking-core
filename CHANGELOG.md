@@ -4,6 +4,11 @@ One entry per release to `main`. Dates are the day the release was merged, in UT
 
 ## Unreleased
 
+## 0.24.0 (2026-11-17)
+
+- What the statement shows after a verification gives each hour as it is said: 8:55 pm.
+- CRM: every sale carries the date and time of its last step, and the views sort by it, newest first.
+
 ## 0.23.0 (2026-11-17)
 
 - An identity confirmation lasts five minutes, so nobody is rushed through opening the app.

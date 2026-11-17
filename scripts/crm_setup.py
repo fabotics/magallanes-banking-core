@@ -51,6 +51,8 @@ FIELDS = [
     ("Opportunity", "Quote_Number__c", "Quote Number", "text"),
     ("Opportunity", "Channel__c", "Channel", "channel"),
     ("Opportunity", "Last_Activity__c", "Last Activity", "day"),
+    # The moment of the last step, so the newest sale sorts to the top of the view.
+    ("Opportunity", "Last_Activity_At__c", "Last Activity (time)", "moment"),
 ]
 CHANNELS = ("Phone", "App", "Telegram")
 
@@ -76,13 +78,14 @@ KINDS = {
     # A plain number, so the amount is not shown with the org's own currency sign.
     "pesos": "<precision>9</precision><scale>0</scale><type>Number</type>",
     "day": "<type>Date</type>",
+    "moment": "<type>DateTime</type>",
     "reason": choices(REASONS),
     "channel": choices(CHANNELS),
 }
 # The first four columns are what a card of the board shows under its title.
 SALE_COLUMNS = (
     "OPPORTUNITY.NAME", "Contact_Name__c", "Monthly_Premium__c", "Channel__c",
-    "Last_Activity__c", "OPPORTUNITY.STAGE_NAME", "OPPORTUNITY.AMOUNT", "Quote_Number__c",
+    "Last_Activity_At__c", "OPPORTUNITY.STAGE_NAME", "OPPORTUNITY.AMOUNT", "Quote_Number__c",
     "Policy_Number__c", "Loss_Reason__c", "OPPORTUNITY.CLOSE_DATE", "OPPORTUNITY.LAST_UPDATE",
 )  # fmt: skip
 LEAD_COLUMNS = ("LEAD.CREATED_DATE", "FULL_NAME", "LEAD.COMPANY", "LEAD.STATUS", "LEAD.LEAD_SOURCE")
@@ -92,9 +95,9 @@ LEAD_COLUMNS = ("LEAD.CREATED_DATE", "FULL_NAME", "LEAD.COMPANY", "LEAD.STATUS",
 # object, name, label, columns, lead source column, newest-first column, stage left out
 VIEWS = [
     ("Opportunity", VIEW, "Voice agent funnel", SALE_COLUMNS,
-     "OPPORTUNITY.LEAD_SOURCE", "LastModifiedDate", "Declined"),
+     "OPPORTUNITY.LEAD_SOURCE", "Last_Activity_At__c", "Declined"),
     ("Opportunity", f"{VIEW}_all", "Voice agent funnel - all", SALE_COLUMNS,
-     "OPPORTUNITY.LEAD_SOURCE", "LastModifiedDate", None),
+     "OPPORTUNITY.LEAD_SOURCE", "Last_Activity_At__c", None),
     ("Lead", VIEW, "Voice agent funnel", LEAD_COLUMNS, "LEAD.LEAD_SOURCE", "CreatedDate", None),
 ]  # fmt: skip
 

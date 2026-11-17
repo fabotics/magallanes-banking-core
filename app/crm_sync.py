@@ -93,6 +93,11 @@ def customer_verified(settings: Settings, customer: Row) -> str:
     return mirrored(settings, lambda: contact(settings, customer))
 
 
+def now() -> str:
+    """Return this moment as the CRM wants a date and time."""
+    return utc_now().isoformat(timespec="seconds")
+
+
 def today() -> str:
     """Return today's date at the bank, as the CRM wants a date."""
     return bank_date(utc_now()).isoformat()
@@ -148,6 +153,7 @@ def offer_logged(
             "Quote_Number__c": offer.get("quote_number"),
             "Channel__c": channel,
             "Last_Activity__c": today(),
+            "Last_Activity_At__c": now(),
         }
         if declined:
             deal["Loss_Reason__c"] = LOSS_REASONS.get(reason, "Other")
@@ -163,7 +169,8 @@ def stage_changed(settings: Settings, offer_id: str, stage: str, **fields: str) 
     """Move the Opportunity of an offer to another stage, with any fields that go with it."""
 
     def step() -> None:
-        change = {"StageName": stage, "Last_Activity__c": today(), **fields}
+        last = {"Last_Activity__c": today(), "Last_Activity_At__c": now()}
+        change = {"StageName": stage, **last, **fields}
         crm.upsert(settings, "Opportunity", "Offer_Reference__c", offer_id, change)
         if stage == "Proposal Sent":
             working = {"Status": "Working - Contacted"}

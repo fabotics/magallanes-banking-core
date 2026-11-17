@@ -80,7 +80,7 @@ def test_the_whole_sale_is_mirrored_stage_by_stage(
         offered["Contact_Name__c"] == "Marta Rojas Fuentes"
         and offered["Monthly_Premium__c"] == 10790
     )
-    assert offered["Quote_Number__c"] == quote["quote_number"] and offered["Last_Activity__c"]
+    assert offered["Quote_Number__c"] == quote["quote_number"] and offered["Last_Activity_At__c"]
     assert offered["Name"].startswith("Marta Rojas Fuentes - ")
 
     body = {"offer_id": offer_id}
