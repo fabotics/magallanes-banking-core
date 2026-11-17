@@ -117,7 +117,8 @@ def test_the_summary_is_headed_in_the_language_of_the_call(
     client.post(url, json={"summary": "All fine.", "language": "en"}, headers=marta)
     first, second, third = texts(sending)
     assert first.startswith(
-        "Banco Magallanes\nSummary of your conversation with Maggie, the virtual assistant:\n\nYou recognised"
+        "Banco Magallanes\nSummary of your conversation with Maggie, the virtual assistant:"
+        "\n\nYou recognised"
     )
     assert (
         "Resumen de su conversación con Maggie" in second
