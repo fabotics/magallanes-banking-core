@@ -17,7 +17,7 @@ from app.db import Repository, get_repository
 from app.errors import ApiError
 from app.routers.identity import (
     MAX_FAILED_ATTEMPTS,
-    normalize_document,
+    heard_document,
     open_session,
     recent_failures,
 )
@@ -41,7 +41,7 @@ def request_confirmation(
     for an approval that cannot come.
     """
     now = utc_now()
-    spoken = normalize_document(body.customer_id or "")
+    spoken = heard_document(repository, body.customer_id or "")
     customer, document, named_by = confirmations.named_customer(
         repository, body.customer_ref, body.phone, spoken
     )
@@ -90,15 +90,22 @@ def confirmation_status(
     """Say where the confirmation stands. Once approved, hand over the session.
 
     With `wait`, the answer is held while the request is pending, so the
-    caller learns of the customer's answer without asking again.
+    caller learns of the customer's answer without asking again. The bank
+    counts the checks: the first request of a conversation is held twice, a
+    later one once. After that the answer comes at once and `next_step` says
+    what to do instead: send a new confirmation, or offer another way.
     """
     filters = {"id": str(request_id)}
-    if not repository.select(confirmations.TABLE, filters):
+    found = repository.select(confirmations.TABLE, filters)
+    if not found:
         raise ApiError(404, "request_not_found", "No such confirmation request.")
+    first = confirmations.is_first(repository, found[0])
+    earlier = confirmations.checks_so_far(repository, request.url.path)
+    allowed = confirmations.CHECKS_ALLOWED["first" if first else "later"]
     confirmation = waiting.until_settled(
         lambda: repository.select(confirmations.TABLE, filters)[0],
         lambda row: confirmations.current_status(row, utc_now()) != "pending",
-        wait,
+        wait if earlier < allowed else 0,
     )
     now = utc_now()
     status = confirmations.current_status(confirmation, now)
@@ -109,7 +116,11 @@ def confirmation_status(
         outcome=f"push_{status}",
     )
     if status != "approved":
-        return PushStatusResponse(status=status)
+        step = confirmations.next_step(status, first, earlier + 1)
+        audit.note(request, check=earlier + 1, next_step=step)
+        return PushStatusResponse(
+            status=status, next_step=step, instruction=confirmations.NEXT_STEPS[step]
+        )
 
     customer = repository.select("customers", {"id": confirmation["customer_id"]})[0]
     token = confirmation["session_token"]

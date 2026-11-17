@@ -64,7 +64,8 @@ def waiting_path(smoke: Smoke, request_id: str) -> None:
     path = f"/v1/identity/push/{request_id}"
     started = time.monotonic()
     held = smoke.step("wait is held while pending", 200, "GET", path, params={"wait": 3})
-    print(f"{'':34} status: {held.get('status')} after {time.monotonic() - started:.1f} s")
+    took = time.monotonic() - started
+    print(f"{'':34} status: {held.get('status')} after {took:.1f} s, then {held.get('next_step')}")
     pin_secret = get_settings().app_pin_secret
     if not pin_secret:
         return print(f"{'':34} no APP_PIN_SECRET: the approval during a wait is skipped")
@@ -87,10 +88,6 @@ def run(smoke: Smoke) -> None:
         "confirmation request to the app", 200, "POST", "/v1/identity/push",
         json={"customer_id": DEMO_CUSTOMER["document_number"], "conversation_id": CONVERSATION},
     )  # fmt: skip
-    waiting = smoke.step(
-        "confirmation is pending", 200, "GET", f"/v1/identity/push/{pushed.get('request_id')}"
-    )
-    print(f"{'':34} status: {waiting.get('status')}")
     waiting_path(smoke, pushed.get("request_id", ""))
     verified = smoke.step(
         "verify identity", 200, "POST", "/v1/identity/verify",

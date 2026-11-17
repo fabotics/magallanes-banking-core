@@ -45,7 +45,7 @@ def test_a_request_is_pending_for_90_seconds_and_hides_the_code(
     row = repository.select(confirmations.TABLE, {"id": result["request_id"]})[0]
     assert row["customer_id"] == seed_id("customer/marta")
     assert len(row["code"]) == 6 and row["code"].isdigit()
-    assert status(client, result["request_id"]) == {"status": "pending"}
+    assert status(client, result["request_id"])["status"] == "pending"
 
 
 def test_the_customer_is_notified_with_the_code_and_a_link_into_the_app(
@@ -81,7 +81,7 @@ def test_an_approval_opens_the_same_session_as_the_spoken_check(
 def test_a_denial_gives_no_session(client: TestClient, repository: InMemoryRepository) -> None:
     request_id = request_push(client)["request_id"]
     answer(repository, request_id, approved=False)
-    assert status(client, request_id) == {"status": "denied"}
+    assert status(client, request_id)["status"] == "denied"
     assert repository.select("verification_sessions") == []
 
 
@@ -92,7 +92,7 @@ def test_a_request_expires_and_cannot_be_approved_late(
     past = (utc_now() - timedelta(seconds=1)).isoformat()
     repository.update(confirmations.TABLE, {"id": request_id}, {"expires_at": past})
     answer(repository, request_id, approved=True)
-    assert status(client, request_id) == {"status": "expired"}
+    assert status(client, request_id)["status"] == "expired"
     assert repository.select("verification_attempts") == []
 
 
@@ -100,7 +100,7 @@ def test_an_answer_cannot_be_changed(client: TestClient, repository: InMemoryRep
     request_id = request_push(client)["request_id"]
     answer(repository, request_id, approved=False)
     answer(repository, request_id, approved=True)
-    assert status(client, request_id) == {"status": "denied"}
+    assert status(client, request_id)["status"] == "denied"
 
 
 def test_an_unknown_document_gets_the_same_answer_and_no_message(

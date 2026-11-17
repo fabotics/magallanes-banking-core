@@ -4,6 +4,7 @@ One verified customer per conversation, days and hours ready-made on the
 bank's clock, and a summary even when the customer hangs up.
 """
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -118,3 +119,69 @@ def test_no_closing_summary_without_a_verified_customer_or_after_the_agents_own(
     assert ended(client, {"conversation_id": TALK}) == nothing
     client.post("/v1/notifications/call-summary", json={"summary": "Listo."}, headers=marta)
     assert ended(client, {"conversation_id": TALK}) == {"sent": False, "reason": "already_sent"}
+
+
+def test_an_id_number_heard_with_noise_still_names_the_customer(
+    client: TestClient, repository: InMemoryRepository
+) -> None:
+    # What speech recognition wrote for 35.628.194-2 in a real call.
+    pushed = client.post(
+        "/v1/identity/push", json={"customer_id": "35628194@, uh, -2"}, headers=API_KEY
+    ).json()
+    row = repository.select(confirmations.TABLE, {"id": pushed["request_id"]})[0]
+    assert row["customer_id"] == seed_id("customer/daniel")
+    said = {"document_number": "3, 35 628 194 dash 2", "card_last4": "5519", "birth_year": 1992}
+    # A stray digit makes another number: the bank never guesses which digits were meant.
+    assert (
+        client.post("/v1/identity/verify", json=said, headers=API_KEY).json()["verified"] is False
+    )
+    said["document_number"] = "uh, 35.628.194 - 2, yes"
+    assert client.post("/v1/identity/verify", json=said, headers=API_KEY).json()["verified"] is True
+    # An ID with letters in it keeps them, and a final K is kept as the check digit.
+    sofia = {"customer_id": "rogs900514mdfbrf04"}
+    pushed = client.post("/v1/identity/push", json=sofia, headers=API_KEY).json()
+    row = repository.select(confirmations.TABLE, {"id": pushed["request_id"]})[0]
+    assert row["customer_id"] == seed_id("customer/sofia")
+
+
+def test_the_bank_counts_the_checks_and_says_what_to_do_next(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    held: list[int] = []
+
+    def no_waiting(read, settled, seconds):  # noqa: ANN001, ANN202
+        held.append(seconds)
+        return read()
+
+    monkeypatch.setattr("app.waiting.until_settled", no_waiting)
+
+    def check(request_id: str) -> dict:
+        return client.get(f"/v1/identity/push/{request_id}?wait=10", headers=API_KEY).json()
+
+    named = {"customer_id": "35.628.194-2", "conversation_id": TALK}
+    first = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
+    assert check(first)["next_step"] == "check_again"
+    second_check = check(first)
+    assert second_check["next_step"] == "send_new_confirmation"
+    assert "sending a new one" in second_check["instruction"]
+    # After the cap the answer comes at once: the request is not held any more.
+    assert check(first)["next_step"] == "send_new_confirmation" and held == [10, 10, 0]
+    # The new confirmation gets one check, then the other way is offered.
+    again = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
+    only_check = check(again)
+    assert only_check["status"] == "pending" and only_check["next_step"] == "offer_other_way"
+    assert "three spoken security questions" in only_check["instruction"]
+    assert check(again)["next_step"] == "offer_other_way" and held == [10, 10, 0, 10, 0]
+
+
+def test_an_approval_still_arrives_after_the_cap(
+    client: TestClient, repository: InMemoryRepository
+) -> None:
+    named = {"customer_id": "35.628.194-2", "conversation_id": TALK}
+    request_id = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
+    for _ in range(3):
+        client.get(f"/v1/identity/push/{request_id}", headers=API_KEY)
+    row = repository.select(confirmations.TABLE, {"id": request_id})[0]
+    confirmations.decide(repository, row, True, utc_now())
+    answer = client.get(f"/v1/identity/push/{request_id}", headers=API_KEY).json()
+    assert answer["status"] == "approved" and "next_step" not in answer

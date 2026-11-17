@@ -125,3 +125,38 @@ def decide(repository: Repository, confirmation: Row, approved: bool, now: datet
     )
     values = {"status": "approved" if approved else "denied", "decided_at": now.isoformat()}
     return repository.update(TABLE, {"id": confirmation["id"]}, values)[0]
+
+
+# How long a caller may keep asking. The first confirmation of a conversation may be checked
+# twice, a second one once. After that the bank says what to do instead of waiting again.
+CHECKS_ALLOWED = {"first": 2, "later": 1}
+NEXT_STEPS = {
+    "check_again": "No answer yet. Check again once, without telling the customer to wait.",
+    "send_new_confirmation": "Stop checking this request. Tell the customer you do not see the "
+    "approval yet and that you are sending a new one. Send one new confirmation, then check "
+    "that one once.",
+    "offer_other_way": "Stop checking and send no more confirmations. Offer the customer the "
+    "three spoken security questions now, or a callback from a person.",
+}
+
+
+def checks_so_far(repository: Repository, endpoint: str) -> int:
+    """Count the earlier checks of one request that were answered pending, from the audit trail."""
+    return len(repository.select("audit_log", {"endpoint": endpoint, "outcome": "push_pending"}))
+
+
+def is_first(repository: Repository, confirmation: Row) -> bool:
+    """Say whether this is the first confirmation asked for in its conversation."""
+    if not confirmation["conversation_id"]:
+        return True
+    same_talk = repository.select(TABLE, {"conversation_id": confirmation["conversation_id"]})
+    return not any(row["created_at"] < confirmation["created_at"] for row in same_talk)
+
+
+def next_step(status: str, first: bool, checks_done: int) -> str | None:
+    """Return what the caller should do after this answer, or None once it is approved."""
+    if status == "approved":
+        return None
+    if status in ("denied", "expired") or not first:
+        return "offer_other_way" if status != "pending" or checks_done >= 1 else "check_again"
+    return "check_again" if checks_done < CHECKS_ALLOWED["first"] else "send_new_confirmation"
