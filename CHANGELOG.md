@@ -4,6 +4,11 @@ One entry per release to `main`. Dates are the day the release was merged, in UT
 
 ## Unreleased
 
+## 0.27.0 (2026-11-17)
+
+- A conversation offers the card cover only. A customer who already holds it is offered nothing in its place.
+- The eligibility answer says where the conversation goes next.
+
 ## 0.26.0 (2026-11-17)
 
 - The answer to a verification holds only what the statement shows: no day of purchase and no merchant.

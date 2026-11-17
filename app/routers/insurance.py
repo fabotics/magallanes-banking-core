@@ -25,6 +25,8 @@ from app.security import require_session, session_from_request
 
 # The insurance catalog is priced and approved for the pilot market only.
 PILOT_COUNTRY = "CL"
+# The one product offered in a conversation. The rest of the catalog is sold elsewhere.
+OFFERED_IN_CONVERSATIONS = "CARD_FRAUD"
 
 router = APIRouter(tags=["insurance"])
 
@@ -33,9 +35,10 @@ def eligible_products(repository: Repository, customer: Row) -> tuple[list[Row],
     """Return the products the customer may be offered, or the reason there are none.
 
     The catalog exists in the pilot country only. Vulnerable customers are
-    never offered a product here: they go to a human advisor. Otherwise a
-    product qualifies when it is active, open to the customer's segment, and
-    not already held.
+    never offered a product here: they go to a human advisor. A conversation
+    offers one product, the card cover, and never another in its place: a
+    customer who already holds it is offered nothing. It qualifies when it is
+    active, open to the customer's segment, and not already held.
     """
     if customer["country"] != PILOT_COUNTRY:
         return [], "not_available_in_country"
@@ -44,7 +47,8 @@ def eligible_products(repository: Repository, customer: Row) -> tuple[list[Row],
     policies = repository.select("policies", {"customer_id": customer["id"], "status": "active"})
     held = {policy["product_code"] for policy in policies}
     catalog = repository.select("insurance_products", {"active": True})
-    for_segment = [p for p in catalog if customer["segment"] in p["eligible_segments"]]
+    on_offer = [p for p in catalog if p["code"] == OFFERED_IN_CONVERSATIONS]
+    for_segment = [p for p in on_offer if customer["segment"] in p["eligible_segments"]]
     available = [p for p in for_segment if p["code"] not in held]
     if available:
         return available, None
@@ -87,7 +91,10 @@ def check_eligibility(
         valid_until = bank_date(parse_time(quote["valid_until"])).isoformat()
         terms = {**product, **quote, "valid_until": valid_until}
         offered.append(OfferedProduct(**{**terms, "code": product["code"]}))
-    return EligibilityResponse(eligible=bool(products), products=offered, reason_if_not=reason)
+    route = "offer" if offered else "wrap_up"
+    return EligibilityResponse(
+        eligible=bool(products), offer_route=route, products=offered, reason_if_not=reason
+    )
 
 
 @router.post("/insurance/offers", response_model=OfferResponse)
