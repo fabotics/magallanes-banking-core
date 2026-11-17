@@ -4,6 +4,8 @@ One entry per release to `main`. Dates are the day the release was merged, in UT
 
 ## Unreleased
 
+## 0.21.1 (2026-11-17)
+
 - Docs: `/docs` has an Authorize button for the API key, a description per group and an example per request body.
 - Errors: an unexpected error answers in the API's own JSON shape, with no detail.
 - Repository: `SECURITY.md`, this changelog, a `Makefile`, coverage and a dependency audit in CI, CodeQL and Dependabot.
