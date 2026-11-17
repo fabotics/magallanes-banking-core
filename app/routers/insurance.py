@@ -13,11 +13,13 @@ from app.clock import bank_date, parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.errors import ApiError
+from app.routers import proposals
 from app.schemas_insurance import (
     EligibilityResponse,
     OfferedProduct,
     OfferRequest,
     OfferResponse,
+    ProposalResponse,
 )
 from app.security import require_session, session_from_request
 
@@ -47,6 +49,21 @@ def eligible_products(repository: Repository, customer: Row) -> tuple[list[Row],
     if available:
         return available, None
     return [], "already_insured" if for_segment else "segment_not_eligible"
+
+
+def answer(offer: Row, sent: ProposalResponse | None, wanted: bool = False) -> OfferResponse:
+    """Shape the answer to a recorded offer, with its proposal when one was sent."""
+    if sent is None:
+        route = "send_proposal" if wanted else "wrap_up"
+        return OfferResponse(offer_id=offer["id"], logged_at=offer["created_at"], offer_route=route)
+    return OfferResponse(
+        offer_id=offer["id"],
+        logged_at=offer["created_at"],
+        offer_route="sign",
+        proposal_number=sent.proposal_number,
+        valid_until=sent.valid_until,
+        message_sent=sent.message_sent,
+    )
 
 
 def session_customer(repository: Repository, session: Row) -> Row:
@@ -84,6 +101,10 @@ def log_offer(
     """Store one offer and the customer's answer. This row is the consent record.
 
     The offer is then copied to the CRM, with the reason when the answer was no.
+    When the customer wants the product, the proposal is created and sent in
+    this same step. A caller that says `sent` or `interested` must have given
+    the customer their quote first, and saying it twice in one conversation
+    returns the same offer.
     """
     session = require_session(request, repository, x_session_token or body.session_token)
     customer = session_customer(repository, session)
@@ -91,6 +112,21 @@ def log_offer(
     chosen = [product for product in products if product["code"] == body.product_code]
     if not chosen:
         raise ApiError(409, "not_eligible", "The bank has not approved this product for them.")
+    wanted = body.customer_response != "declined"
+    if body.outcome and wanted and not quotes.given(repository, customer, chosen[0], utc_now()):
+        message = "Check eligibility and tell the customer their price before recording a yes."
+        raise ApiError(409, "quote_not_given", message)
+    talk = body.conversation_id or session["conversation_id"]
+    same = {"customer_id": customer["id"], "product_code": body.product_code}
+    earlier = [
+        row
+        for row in repository.select("insurance_offers", {**same, "conversation_id": talk})
+        if talk and wanted and body.outcome and row["customer_response"] != "declined"
+    ]
+    if earlier:
+        # Said twice in one conversation: the same offer, and its proposal goes out again.
+        sent = proposals.issue(request, repository, settings, customer, earlier[0], body.language)
+        return answer(earlier[0], sent)
     # The offer keeps the number of the quote the customer heard.
     quote = quotes.current(repository, customer, chosen[0], utc_now())
     offer = repository.insert(
@@ -99,7 +135,7 @@ def log_offer(
             "customer_id": session["customer_id"],
             "product_code": body.product_code,
             "quote_number": quote["quote_number"],
-            "conversation_id": body.conversation_id or session["conversation_id"],
+            "conversation_id": talk,
             "customer_response": body.customer_response,
             "created_at": utc_now().isoformat(),
         },
@@ -113,4 +149,9 @@ def log_offer(
     crm_sync.noted(request, copied)
     if body.loss_reason:
         audit.note(request, loss_reason=body.loss_reason)
-    return OfferResponse(offer_id=offer["id"], logged_at=offer["created_at"])
+    if not wanted or not body.outcome:
+        # The older way of recording an answer leaves the proposal to a second request.
+        return answer(offer, None, wanted)
+    return answer(
+        offer, proposals.issue(request, repository, settings, customer, offer, body.language)
+    )

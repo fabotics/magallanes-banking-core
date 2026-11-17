@@ -56,6 +56,12 @@ def current(repository: Repository, customer: Row, product: Row, now: datetime) 
     )
 
 
+def given(repository: Repository, customer: Row, product: Row, now: datetime) -> bool:
+    """Say whether the customer already has a valid quote for this product."""
+    filters = {"customer_id": customer["id"], "product_code": product["code"]}
+    return any(parse_time(q["valid_until"]) > now for q in repository.select("quotes", filters))
+
+
 def priced(repository: Repository, product: Row, quote_number: str | None) -> Row:
     """Return the product with the premium and limit of a quote in place of the catalog's.
 

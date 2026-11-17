@@ -56,6 +56,10 @@ class OfferRequest(BaseModel):
         default=None, description="The older way to say the same. Use `outcome` instead."
     )
     conversation_id: str | None = None
+    language: Literal["es", "en"] | None = Field(
+        default=None,
+        description="Language the call is held in. The proposal's message and link follow it.",
+    )
     session_token: str | None = Field(
         default=None, description="Only if the X-Session-Token header is not used."
     )
@@ -72,10 +76,24 @@ class OfferRequest(BaseModel):
 
 
 class OfferResponse(BaseModel):
-    """Proof that the offer and the answer were stored."""
+    """Proof that the offer and the answer were stored, and what happens next.
+
+    When the customer wants the product, the bank sends the proposal in this
+    same step, so the answer also carries the proposal.
+    """
 
     offer_id: str
     logged_at: str
+    offer_route: Literal["sign", "send_proposal", "wrap_up"] = Field(
+        description="Where the conversation goes next: sign when the proposal is on its way "
+        "to the customer, send_proposal when it still has to be asked for, wrap_up when "
+        "they said no."
+    )
+    proposal_number: str | None = None
+    valid_until: str | None = Field(default=None, description="Last day to sign, ISO date.")
+    message_sent: bool | None = Field(
+        default=None, description="True when the link went to the customer's chat."
+    )
 
 
 class ProposalRequest(BaseModel):
