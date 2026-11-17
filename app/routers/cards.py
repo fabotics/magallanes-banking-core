@@ -14,7 +14,12 @@ from app.clock import parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.errors import ApiError
-from app.schemas import BlockCardRequest, BlockCardResponse, TransactionsResponse
+from app.schemas import (
+    BlockCardRequest,
+    BlockCardResponse,
+    ExplanationResponse,
+    TransactionsResponse,
+)
 from app.security import require_session, session_from_request
 
 router = APIRouter(tags=["cards"])
@@ -42,6 +47,19 @@ def get_transactions(
     answer = overview.movements(repository, session["customer_id"], days, status)
     audit.note(request, count=answer.count)
     return answer
+
+
+@router.get("/cards/charges/explanation", response_model=ExplanationResponse)
+def explain_charges(
+    session: Annotated[Row, Depends(session_from_request)],
+    repository: Annotated[Repository, Depends(get_repository)],
+) -> ExplanationResponse:
+    """Say when the customer's repeated charges were really made, and why the dates differ.
+
+    A caller asks this together with the merchant lookup, once the customer
+    asks or doubts. Until then it holds nothing that tells the day of purchase.
+    """
+    return ExplanationResponse(charges=overview.explained(repository, session["customer_id"]))
 
 
 def block_reference(card: Row) -> str:
