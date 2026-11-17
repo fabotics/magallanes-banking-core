@@ -116,8 +116,14 @@ def test_the_summary_is_headed_in_the_language_of_the_call(
     client.post(url, json={"summary": "Reconoció los cargos."}, headers=marta)
     client.post(url, json={"summary": "All fine.", "language": "en"}, headers=marta)
     first, second, third = texts(sending)
-    assert first.startswith("Banco Magallanes\nSummary of your call:\n\nYou recognised")
-    assert "Resumen de tu llamada:" in second and "Summary of your call:" in third
+    assert first.startswith(
+        "Banco Magallanes\nSummary of your conversation with Maggie, the virtual assistant:"
+        "\n\nYou recognised"
+    )
+    assert (
+        "Resumen de su conversación con Maggie" in second
+        and "Summary of your conversation" in third
+    )
 
 
 def test_an_unknown_language_on_file_falls_back_to_spanish() -> None:

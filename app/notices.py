@@ -22,7 +22,7 @@ WORDS = {
         "policy": "Su seguro {name} quedó contratado.\n\nPóliza: {number}\n"
         "Vigente desde: {start}\nPrima mensual: {premium}\n\n"
         "Puede darlo de baja en cualquier momento desde la app.",
-        "summary": "Resumen de tu llamada:",
+        "summary": "Resumen de su conversación con Maggie, la asistente virtual:",
         "premium": "Prima mensual",
         "sign_link": "Revisar y firmar la propuesta",
         "unsigned": "Nada queda contratado hasta que usted firme.",
@@ -42,7 +42,7 @@ WORDS = {
         "policy": "Your {name} insurance is now active.\n\nPolicy: {number}\n"
         "In force from: {start}\nMonthly premium: {premium}\n\n"
         "You can cancel it at any time from the app.",
-        "summary": "Summary of your call:",
+        "summary": "Summary of your conversation with Maggie, the virtual assistant:",
         "premium": "Monthly premium",
         "sign_link": "Review and sign the proposal",
         "unsigned": "Nothing is taken out until you sign.",
