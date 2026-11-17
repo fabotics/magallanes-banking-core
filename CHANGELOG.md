@@ -8,6 +8,12 @@ One entry per release to `main`. Dates are the day the release was merged, in UT
 - Errors: an unexpected error answers in the API's own JSON shape, with no detail.
 - Repository: `SECURITY.md`, this changelog, a `Makefile`, coverage and a dependency audit in CI, CodeQL and Dependabot.
 
+## 0.21.0 (2026-11-17)
+
+- A successful verification carries the profile and the recent card movements.
+- The customer's answer about their charges is recorded: recognised or not recognised.
+- A case opened too early can be withdrawn.
+
 ## 0.20.1 (2026-11-17)
 
 - The assistant in the app has a name, Maggie.

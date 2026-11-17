@@ -36,6 +36,11 @@ class VerifyResponse(BaseModel):
     )
     first_name: str | None = None
     attempts_remaining: int | None = None
+    overview: "Overview | None" = Field(
+        default=None,
+        description="When verified: the profile and the recent card movements, so the caller "
+        "does not have to ask for them.",
+    )
 
 
 class HeldProduct(BaseModel):
@@ -114,6 +119,13 @@ class TransactionsResponse(BaseModel):
     timezone: str = Field(description="Every day and hour in this answer is on this clock.")
     repeated_charges: list[RepeatedCharges]
     transactions: list[CardTransaction]
+
+
+class Overview(BaseModel):
+    """What a caller needs right after verifying the customer, so it asks for nothing more."""
+
+    customer: CustomerProfile
+    charges: TransactionsResponse = Field(description="Card movements of the last 30 days.")
 
 
 class BlockCardRequest(BaseModel):

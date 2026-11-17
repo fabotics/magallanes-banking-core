@@ -72,3 +72,31 @@ class RoutesResponse(BaseModel):
     callback: Route
     meeting: Route
     service_hours: str
+
+
+class ReviewRequest(BaseModel):
+    """The customer's answer after their charges were explained to them."""
+
+    model_config = ConfigDict(json_schema_extra={"example": {"outcome": "recognised"}})
+
+    outcome: Literal["recognised", "not_recognised"] = Field(
+        description="recognised: the charges are theirs. not_recognised: they said, after the "
+        "explanation, that the charges are not theirs. A doubt or a question is neither."
+    )
+    session_token: str | None = Field(
+        default=None, description="Only if the X-Session-Token header is not used."
+    )
+
+
+class ReviewResponse(BaseModel):
+    """The recorded answer and what to do next."""
+
+    outcome: str
+    next_step: str
+
+
+class WithdrawResponse(BaseModel):
+    """The case that was taken back."""
+
+    case_number: str
+    status: Literal["withdrawn"]

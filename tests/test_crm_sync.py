@@ -216,3 +216,17 @@ def test_the_channel_is_the_one_the_customer_was_named_by(
     # A customer verified by the spoken check: the bank does not know the channel.
     spoken = log_offer(client, verified(client), outcome="sent")
     assert opportunity_changes(sent, spoken)[0]["Channel__c"] is None
+
+
+def test_a_withdrawn_case_is_closed_in_the_crm_too(
+    client: TestClient, sent: list[tuple[str, str, dict]]
+) -> None:
+    marta = verified(client)
+    case = {"type": "fraud", "category": "service", "summary": "No reconoce cargos."}
+    number = client.post("/v1/cases", json=case, headers=marta).json()["case_number"]
+    sent.clear()
+    assert client.post(f"/v1/cases/{number}/withdraw", headers=marta).status_code == 200
+    (_, _, looked_for), (method, path, change) = sent
+    assert number in looked_for["q"] and "FROM Case" in looked_for["q"]
+    assert (method, path) == ("PATCH", "/sobjects/Case/ACCOUNT")
+    assert change["Status"] == "Closed" and change["Subject"].endswith("(withdrawn)")

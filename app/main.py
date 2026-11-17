@@ -27,6 +27,7 @@ from app.routers import (
     notifications,
     proposals,
     registry,
+    review,
     signing,
 )
 from app.security import require_api_key
@@ -87,6 +88,7 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
         accounts,
         cards,
         cases,
+        review,
         insurance,
         proposals,
         registry,

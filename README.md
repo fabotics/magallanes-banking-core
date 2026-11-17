@@ -86,6 +86,7 @@ app/
   waiting.py           how long a status request is held, and what to do next
   quotes.py            the premium and limit the bank's rules give one customer
   statement.py         card movements in words: day, hour, repeated charges
+  overview.py          the profile and recent movements returned with a verification
   closing.py           the bank's own summary when a conversation ends without one
   crm.py, crm_sync.py  optional copy of the insurance sale to the CRM
   pins.py              PIN hashing
@@ -103,7 +104,7 @@ app/
   schemas_notifications.py   request and response models
   routers/             identity, identity_push, customers, accounts, cards, cases, insurance,
                        proposals, registry, notifications, signing,
-                       app_auth, app_pages, app_contract, app_assistant, brand
+                       app_auth, app_pages, app_contract, app_assistant, brand, review
   templates/           sign.html (signing link) and app/ (the customer app)
 db/schema.sql          tables, checks, indexes, row level security
 seed/                  fictional customers and transactions, dated relative to today
@@ -143,7 +144,7 @@ Interactive documentation is served at `/docs` ([live](https://magallanes-bankin
 | --- | --- | --- |
 | GET `/health` | no | Liveness and database status |
 | POST `/v1/identity/push` | no | Ask the customer to confirm their identity in the bank's app. Name them by `customer_ref` (a conversation started inside the app), by `phone` (the caller's number, matched to the phone on file) or by `customer_id` (the national ID number they say). Returns a `request_id`, pending for 90 seconds. A caller may send both `customer_ref` and `phone`, whatever its channel carries: the bank uses the one that names a customer, and answers `not_identified` when neither does, so the caller asks for the ID number at once |
-| GET `/v1/identity/push/{request_id}` | no | pending, approved, denied or expired. Once approved it returns the session token. `wait` (0 to 20 seconds) holds the request while it is pending. The bank counts the checks: the first request of a conversation is held twice, a later one once, and after that the answer comes at once. `next_step` says what to do: `check_again`, `send_new_confirmation` or `offer_other_way`, with the same in a sentence in `instruction` |
+| GET `/v1/identity/push/{request_id}` | no | pending, approved, denied or expired. Once approved it returns the session token and `overview`: the customer's profile and the card movements of the last 30 days, so the caller does not ask for them one by one. `wait` (0 to 20 seconds) holds the request while it is pending. The bank counts the checks: the first request of a conversation is held twice, a later one once, and after that the answer comes at once. `next_step` says what to do: `check_again`, `send_new_confirmation` or `offer_other_way`, with the same in a sentence in `instruction` |
 | POST `/v1/identity/verify` | no | Fallback: verify by document, card digits and birth year, and open a session |
 | GET `/v1/customers/me` | yes | First name, segment, language, products held |
 | GET `/v1/accounts/balance` | yes | Available balance per account |
@@ -155,6 +156,8 @@ Interactive documentation is served at `/docs` ([live](https://magallanes-bankin
 | POST `/v1/insurance/offers` | yes | Record an offer and how it ended. `outcome` is `sent` (the customer wants the proposal), `interested` (they want to read it first) or `declined`, with a `loss_reason` for a no: `not_interested`, `price`, `already_insured` or `other`. The older `customer_response` (accepted, declined, info_requested) still works |
 | POST `/v1/insurance/proposals` | yes | Create the proposal for an offer and send it by email and to the customer's chat. It is a contract to sign whether the customer accepted or asked for the details: signing is what accepts. Asking again sends the same proposal again. `valid_until` is the last day to sign, 15 days like the quote |
 | GET `/v1/insurance/proposals/{proposal_id}` | yes | `proposal_id` is the proposal number. pending, signed or expired. Once signed: the policy number and the start date. `wait` (0 to 20 seconds) holds the request while it is unsigned |
+| POST `/v1/cards/review` | yes | Record the customer's answer after their charges were explained: `recognised` or `not_recognised`. A doubt or a question is neither, and no case is opened on one |
+| POST `/v1/cases/{case_number}/withdraw` | yes | Take back a case the customer no longer needs, for example one opened before they recognised the charges. Closes it, clears the dispute on its charges and closes its copy in the CRM |
 | POST `/v1/notifications/call-summary` | yes | Send a written summary of the call to the customer's messaging channel (Telegram) |
 | POST `/v1/notifications/conversation-ended` | no | The caller's platform says a conversation is over (`conversation_id`, at the top level or inside `data`). If the agent sent no summary, the bank writes its own from what it recorded: cases, card blocks, proposals, policies |
 | GET `/v1/registry/merchants/{tax_id}` | no | The business behind a merchant tax ID |
@@ -288,7 +291,7 @@ ruff format --check .
 pytest -q --cov
 ```
 
-The tests run on an in-memory repository and need no network or `.env`. There are 277 of them and they cover 97% of the lines of `app/`, `seed/` and the dashboard metrics. The same checks run on every pull request, together with an audit of the dependencies for known vulnerabilities and a CodeQL scan, and the build fails if coverage drops below 90%.
+The tests run on an in-memory repository and need no network or `.env`. There are 280 of them and they cover 97% of the lines of `app/`, `seed/` and the dashboard metrics. The same checks run on every pull request, together with an audit of the dependencies for known vulnerabilities and a CodeQL scan, and the build fails if coverage drops below 90%.
 
 `make help` lists the common tasks: `install`, `run`, `test`, `lint`, `format`, `seed`, `smoke` and `audit`.
 

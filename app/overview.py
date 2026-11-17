@@ -1,0 +1,101 @@
+"""Everything a caller needs right after the customer is verified, in one answer.
+
+A voice agent that verifies the customer and then asks for the profile and for
+the card movements makes three calls in a row, and the customer waits through
+each one. So the answer to a successful verification already carries the
+profile and the recent movements, with the repeated charges added up.
+"""
+
+from datetime import timedelta
+
+from app import statement
+from app.clock import parse_time, utc_now
+from app.db import Repository, Row
+from app.schemas import (
+    CardTransaction,
+    CustomerProfile,
+    HeldProduct,
+    Overview,
+    TransactionsResponse,
+)
+
+RECENT_DAYS = 30
+
+
+def held_products(repository: Repository, customer_id: str) -> list[HeldProduct]:
+    """List the customer's accounts, cards and active insurance policies."""
+    products = []
+    for account in repository.select("accounts", {"customer_id": customer_id}):
+        name = f"{account['type']} account in {account['currency']}"
+        products.append(HeldProduct(kind="account", name=name, status="active"))
+    for card in repository.select("cards", {"customer_id": customer_id}):
+        name = f"{card['brand']} {card['type']} card ending {card['last4']}"
+        products.append(HeldProduct(kind="card", name=name, status=card["status"]))
+    catalog = {row["code"]: row["name"] for row in repository.select("insurance_products")}
+    for policy in repository.select("policies", {"customer_id": customer_id, "status": "active"}):
+        name = catalog[policy["product_code"]]
+        products.append(HeldProduct(kind="insurance", name=name, status="active"))
+    return products
+
+
+def profile(repository: Repository, customer: Row) -> CustomerProfile:
+    """Return who the customer is and what they hold."""
+    return CustomerProfile(
+        first_name=customer["first_name"],
+        segment=customer["segment"],
+        country=customer["country"],
+        preferred_language=customer["preferred_language"],
+        is_vulnerable=customer["is_vulnerable"],
+        products=held_products(repository, customer["id"]),
+    )
+
+
+def to_transaction(row: Row, card_last4: str) -> CardTransaction:
+    """Shape a stored transaction for an answer. Foreign charges keep their original amount.
+
+    Days and hours are given on the bank's clock, also in words.
+    """
+    fields = {
+        "id": row["id"],
+        "card_last4": card_last4,
+        "amount": row["amount"],
+        "currency": row["currency"],
+        "descriptor": row["descriptor"],
+        "merchant_tax_id": row["merchant_tax_id"],
+        "channel": row["channel"],
+        "country": row["country"],
+        **statement.local_fields(row),
+        "status": row["status"],
+    }
+    if row["original_currency"]:
+        fields["original_amount"] = row["original_amount"]
+        fields["original_currency"] = row["original_currency"]
+    return CardTransaction(**fields)
+
+
+def movements(
+    repository: Repository, customer_id: str, days: int = RECENT_DAYS, status: str = "all"
+) -> TransactionsResponse:
+    """Return the customer's recent card movements, newest first, with repeats added up."""
+    since = utc_now() - timedelta(days=days)
+    transactions = []
+    for card in repository.select("cards", {"customer_id": customer_id}):
+        for row in repository.select("transactions", {"card_id": card["id"]}):
+            is_recent = parse_time(row["transaction_at"]) >= since
+            if is_recent and status in ("all", row["status"]):
+                transactions.append(to_transaction(row, card["last4"]))
+    transactions.sort(key=lambda item: parse_time(item.transaction_at), reverse=True)
+    return TransactionsResponse(
+        count=len(transactions),
+        timezone=statement.TIMEZONE_NAME,
+        repeated_charges=statement.repeated_charges([item.model_dump() for item in transactions]),
+        transactions=transactions,
+    )
+
+
+def after_verification(repository: Repository, customer: Row) -> Overview:
+    """Return the profile and the recent movements of a customer who was just verified."""
+    return Overview(
+        customer=profile(repository, customer),
+        charges=movements(repository, customer["id"]),
+    )
