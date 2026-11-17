@@ -278,3 +278,35 @@ def test_a_case_opened_too_early_can_be_taken_back(
     assert stored["summary"].count("Retirado") == 1
     emma = verify_in_app(client, repository, customer_id="35.897.932-7")
     assert client.post(f"/v1/cases/{number}/withdraw", headers=emma).status_code == 404
+
+
+def test_a_yes_cannot_be_recorded_before_the_customer_heard_the_price(
+    client: TestClient, marta: dict
+) -> None:
+    early = {"product_code": "CARD_FRAUD", "outcome": "sent"}
+    refused = client.post("/v1/insurance/offers", json=early, headers=marta)
+    assert refused.status_code == 409 and refused.json()["error"] == "quote_not_given"
+    # A no needs no quote: the customer may refuse to hear the offer at all.
+    no = {"product_code": "CARD_FRAUD", "outcome": "declined", "loss_reason": "not_interested"}
+    assert (
+        client.post("/v1/insurance/offers", json=no, headers=marta).json()["offer_route"]
+        == "wrap_up"
+    )
+
+
+def test_recording_a_yes_sends_the_proposal_in_the_same_step(
+    client: TestClient, repository: InMemoryRepository, with_bot: None, telegram: list[dict]
+) -> None:
+    marta = verify_in_app(client, repository, customer_id="31.415.926-8")
+    client.get("/v1/insurance/eligibility", headers=marta)
+    yes = {"product_code": "CARD_FRAUD", "outcome": "sent", "language": "es"}
+    before = len(telegram)
+    recorded = client.post("/v1/insurance/offers", json=yes, headers=marta).json()
+    assert recorded["offer_route"] == "sign" and recorded["proposal_number"].startswith("PR-")
+    assert recorded["message_sent"] is True and len(telegram) == before + 1
+    assert f"/app/proposals/{recorded['proposal_number']}" in home_of(client, "marta")
+    # Said again in the same conversation: the same offer and proposal, sent once more.
+    again = client.post("/v1/insurance/offers", json=yes, headers=marta).json()
+    assert again["offer_id"] == recorded["offer_id"]
+    assert again["proposal_number"] == recorded["proposal_number"]
+    assert len(repository.select("insurance_offers")) == 1 and len(telegram) == before + 2

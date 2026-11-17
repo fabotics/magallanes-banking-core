@@ -4,6 +4,12 @@ One entry per release to `main`. Dates are the day the release was merged, in UT
 
 ## Unreleased
 
+## 0.25.0 (2026-11-17)
+
+- Recording that a customer wants an offer also creates and sends the proposal, in one step.
+- A yes cannot be recorded before the customer got their quote, and a second yes in the same conversation returns the first offer.
+- The answer to a recorded offer says where the conversation goes next.
+
 ## 0.24.0 (2026-11-17)
 
 - What the statement shows after a verification gives each hour as it is said: 8:55 pm.
