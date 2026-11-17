@@ -75,6 +75,13 @@ def test_the_whole_sale_is_mirrored_stage_by_stage(
         offered["CloseDate"] <= quote["valid_until"][:10] and offered["LeadSource"] == "Voice agent"
     )
     assert ("POST", "/sobjects/OpportunityContactRole") == sent[-1][:2]
+    # What a card of the board shows: who, how much a month, which quote, and when.
+    assert (
+        offered["Contact_Name__c"] == "Marta Rojas Fuentes"
+        and offered["Monthly_Premium__c"] == 10790
+    )
+    assert offered["Quote_Number__c"] == quote["quote_number"] and offered["Last_Activity__c"]
+    assert offered["Name"].startswith("Marta Rojas Fuentes - ")
 
     body = {"offer_id": offer_id}
     number = client.post("/v1/insurance/proposals", json=body, headers=session).json()
@@ -82,7 +89,7 @@ def test_the_whole_sale_is_mirrored_stage_by_stage(
     client.post("/app/login", data={"u": MARTA_ID, "pin": app_pin(PIN_SECRET, "marta")})
     client.post(f"/app/proposals/{number['proposal_number']}", data=SIGNATURE)
     stages = [change["StageName"] for change in opportunity_changes(sent, offer_id)]
-    assert stages == ["Offered", "Proposal Sent", "Closed Won"]
+    assert stages == ["Offered", "Proposal Sent", "Signed"]
     won = opportunity_changes(sent, offer_id)[-1]
     assert won["Policy_Number__c"] == repository.select("policies")[-1]["policy_number"]
 
@@ -97,7 +104,7 @@ def test_a_no_is_born_closed_lost_with_its_reason(
     answer = {"outcome": "declined", **({"loss_reason": reason} if reason else {})}
     offer_id = log_offer(client, verified(client), **answer)
     (lost,) = opportunity_changes(sent, offer_id)
-    assert lost["StageName"] == "Closed Lost" and lost["Loss_Reason__c"] == label
+    assert lost["StageName"] == "Declined" and lost["Loss_Reason__c"] == label
 
 
 def test_the_outcome_is_stored_as_the_answer_and_the_old_field_still_works(
@@ -155,13 +162,57 @@ def test_the_seeded_funnel_is_invented_marked_and_always_the_same() -> None:
     crowd = people(400, today)
     assert crowd == people(400, today) and len({person["key"] for person in crowd}) == 400
     stages = Counter(person["stage"] for person in crowd)
-    assert stages == {"Closed Lost": 140, "Offered": 120, "Proposal Sent": 60, "Closed Won": 80}
+    assert stages == {
+        "Declined": 220, "Offered": 60, "Interested": 40, "Proposal Sent": 32, "Signed": 48
+    }  # fmt: skip
+    assert len({(person["first"], person["last"]) for person in crowd}) == 400
+    weeks = {(today - date.fromisoformat(person["offered"][:10])).days // 7 for person in crowd}
+    assert weeks == set(range(13))
+    still_open = [person for person in crowd if person["stage"] not in ("Declined", "Signed")]
+    recent = [p for p in still_open if (today - date.fromisoformat(p["offered"][:10])).days < 14]
+    assert len(recent) > len(still_open) * 0.6
     for person in crowd:
         number, digit = person["document"].split("-")
         assert 30_000_000 <= int(number) < 35_000_000 and rut_check_digit(int(number)) == digit
-        assert (today - person["close"]).days <= 89 and person["amount"] % 12 == 0
-        assert (person["reason"] is not None) == (person["stage"] == "Closed Lost")
+        assert person["premium"] in (11990, 10790, 10190)
+        assert person["channel"] in ("Phone", "App", "Telegram")
+        assert (person["reason"] is not None) == (person["stage"] == "Declined")
     contact, lead, deal = records(crowd[0], "ACCOUNT")
     for record in (contact, lead, deal):
         assert record["Seeded__c"] is True and record["LeadSource"] == "Voice agent"
         assert "Email" not in record and "Phone" not in record
+        assert record["CreatedDate"] <= record["LastModifiedDate"]
+    assert deal["Amount"] == deal["Monthly_Premium__c"] * 12 and deal["Contact_Name__c"]
+    assert deal["Quote_Number__c"].startswith("CT-") and deal["Last_Activity__c"]
+
+
+def test_an_interested_customer_stays_interested_until_they_sign(
+    client: TestClient, sent: list
+) -> None:
+    session = verified(client)
+    offer_id = log_offer(client, session, outcome="interested")
+    client.post("/v1/insurance/proposals", json={"offer_id": offer_id}, headers=session)
+    changes = opportunity_changes(sent, offer_id)
+    assert [change["StageName"] for change in changes] == ["Interested", "Interested"]
+    assert changes[1]["Proposal_Number__c"].startswith("PR-")
+
+
+def test_the_channel_is_the_one_the_customer_was_named_by(
+    client: TestClient, repository: InMemoryRepository, sent: list
+) -> None:
+    from app import confirmations
+    from app.clock import utc_now
+
+    talk = {"conversation_id": "from-the-app"}
+    pushed = client.post(
+        "/v1/identity/push", json={"customer_ref": MARTA_ID, **talk}, headers=API_KEY
+    ).json()
+    row = repository.select(confirmations.TABLE, {"id": pushed["request_id"]})[0]
+    confirmations.decide(repository, row, True, utc_now())
+    status = client.get(f"/v1/identity/push/{pushed['request_id']}", headers=API_KEY).json()
+    session = {**API_KEY, "X-Session-Token": status["session_token"]}
+    in_app = log_offer(client, session, outcome="sent")
+    assert opportunity_changes(sent, in_app)[0]["Channel__c"] == "App"
+    # A customer verified by the spoken check: the bank does not know the channel.
+    spoken = log_offer(client, verified(client), outcome="sent")
+    assert opportunity_changes(sent, spoken)[0]["Channel__c"] is None

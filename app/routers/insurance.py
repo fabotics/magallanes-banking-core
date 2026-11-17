@@ -108,7 +108,8 @@ def log_offer(
     priced = quotes.priced(repository, chosen[0], quote["quote_number"])
     valid_until = bank_date(parse_time(quote["valid_until"]))
     reason = body.loss_reason or "other"
-    copied = crm_sync.offer_logged(settings, customer, offer, priced, valid_until, reason)
+    channel = crm_sync.channel_of(repository, offer["conversation_id"])
+    copied = crm_sync.offer_logged(settings, customer, offer, priced, valid_until, reason, channel)
     crm_sync.noted(request, copied)
     if body.loss_reason:
         audit.note(request, loss_reason=body.loss_reason)

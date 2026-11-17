@@ -191,22 +191,25 @@ The bank core is the record that counts. When a CRM is configured, each step of 
 | What happens at the bank | What appears in the CRM |
 | --- | --- |
 | A customer is verified, by the app or by the spoken check | A Contact, found by `Customer_Reference__c` (the customer's reference). First name, last name and country only: no document number, email or phone |
-| An offer is logged | A Lead named after the customer, with the product as its company, and an Opportunity in stage `Offered`. Amount is the yearly premium (the quoted monthly premium times 12) and the close date is the last day of the quote |
-| The customer says no | The Opportunity is created `Closed Lost`, with the `Loss_Reason__c` the caller passed |
-| The proposal is sent | Stage `Proposal Sent`, with the proposal number |
-| The customer signs, in the app or on the signing link | Stage `Closed Won`, with the policy number and the day of the signature as close date |
+| An offer is logged | A Lead named after the customer, with the product as its company, and an Opportunity: in stage `Offered` when the customer wants the proposal, `Interested` when they want to read it first. Amount is the yearly premium (the quoted monthly premium times 12) and the close date is the last day of the quote. The Opportunity also carries what a card on a sales board shows: the contact's name, the monthly premium, the quote number, the day of the last activity, and the channel when the bank knows it (App or Phone, from how the customer was named at the start) |
+| The customer says no | The Opportunity is created `Declined`, with the `Loss_Reason__c` the caller passed |
+| The proposal is sent | Stage `Proposal Sent`, with the proposal number. A customer who only wanted to read it first stays `Interested` |
+| The customer signs, in the app or on the signing link | Stage `Signed`, with the policy number and the day of the signature as close date |
+
+The sales process has five stages and no others, in this order: Offered, Interested, Proposal Sent, Signed (won), Declined (lost).
 
 Every record carries the lead source `Voice agent`. Records are found by external IDs (`Customer_Reference__c`, `Offer_Reference__c`), so a repeated call updates and never duplicates. The code is two small modules: `app/crm.py` signs in with the OAuth 2.0 client credentials flow and sends requests with an eight second limit, and `app/crm_sync.py` says what is copied at each step.
 
 Set `SALESFORCE_INSTANCE_URL`, `SALESFORCE_CLIENT_ID`, `SALESFORCE_CLIENT_SECRET` and `SALESFORCE_API_VERSION` (see `.env.example`). Without the instance URL nothing is sent, so tests and local runs stay offline. Three scripts go with it:
 
 ```bash
-python scripts/crm_setup.py         # once per org: stages, lead source, fields, permission set, list views
+python scripts/crm_setup.py         # once per org: the five stages, lead source, fields, permission set, list views
 python scripts/crm_seed.py          # about 400 fictional customers across the funnel; --wipe removes them
 python scripts/crm_check.py         # one whole sale, in memory at the bank, checked in the CRM itself
+python scripts/crm_cleanup.py       # deletes the demo customer's Opportunity and Lead, keeps the Contact
 ```
 
-`crm_setup.py` adds the stages `Offered` and `Proposal Sent`, the fields above plus `Seeded__c`, and a list view "Voice agent funnel" for opportunities and leads, newest first. `crm_seed.py` invents its customers (names from two lists, document numbers from a range that was never issued, no emails or phones), marks every record `Seeded__c = true`, and updates the same records when it runs again. `crm_check.py` verifies the main demo customer, logs the offer, sends the proposal and signs it, and after each step reads the Opportunity back: the stages must be Offered, Proposal Sent, Closed Won, and the signed sale must be the first row of the list view.
+`crm_setup.py` makes the five stages the only active ones (the org's default stages are switched off), adds the fields above plus `Seeded__c`, and a list view "Voice agent funnel" for opportunities and leads, newest first. Its first four columns are what a card shows when the view is displayed as a board. `crm_seed.py` invents its customers (names from two lists that never repeat, document numbers from a range that was never issued, no emails or phones) and spreads about 400 offers over the last 90 days: 55% declined, 15% offered, 10% interested, 8% with a proposal, 12% signed, the open ones mostly from the last two weeks. Records are created with the date of their offer, so every week has some. Every record is marked `Seeded__c = true`, and running the script again replaces the seeded funnel. `crm_check.py` verifies the main demo customer, logs the offer, sends the proposal and signs it, and after each step reads the Opportunity back: the stages must be Offered, Proposal Sent, Signed, and the signed sale must be the first row of the list view.
 
 ## Run it locally
 

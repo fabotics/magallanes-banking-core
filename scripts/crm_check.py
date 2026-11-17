@@ -7,7 +7,7 @@ Usage:
 The bank runs here in memory, on seed data, so no database is touched. Only
 the CRM is real. The main demo customer is verified, hears the offer, gets
 the proposal and signs it in the app. After each step the Opportunity is read
-back from the CRM: its stages must be Offered, Proposal Sent, Closed Won, and
+back from the CRM: its stages must be Offered, Proposal Sent, Signed, and
 after the signature it must be the first row of the list view.
 """
 
@@ -34,7 +34,7 @@ SIGNATURE = {
     "signature_name": "Daniel Keller",
     "accept": "yes",
 }
-EXPECTED = ["Offered", "Proposal Sent", "Closed Won"]
+EXPECTED = ["Offered", "Proposal Sent", "Signed"]
 
 
 def stage_in_crm(settings: Settings, offer_id: str) -> str:
@@ -86,7 +86,7 @@ def run(settings: Settings, keep: bool) -> bool:
         for kind in ("Opportunity", "Lead"):
             crm.call(settings, "DELETE", f"/sobjects/{kind}/Offer_Reference__c/{offer_id}")
         print("the test sale was deleted from the CRM, the contact stays")
-    return seen == EXPECTED and first.endswith("Daniel Keller") and len(contacts) == 1
+    return seen == EXPECTED and first.startswith("Daniel Keller") and len(contacts) == 1
 
 
 def main() -> None:
