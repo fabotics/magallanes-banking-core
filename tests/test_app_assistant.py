@@ -34,7 +34,7 @@ def test_without_a_snippet_there_is_no_button_and_no_widget(client: TestClient) 
     home = sign_in(client).get("/app/home").text
     assert "/app/assistant" not in home
     page = client.get("/app/assistant")
-    assert "Asistente no disponible" in page.text and "<script src" not in page.text
+    assert "Maggie no está disponible" in page.text and "<script src" not in page.text
 
 
 def test_the_widget_exists_only_behind_the_pin(client: TestClient, with_widget: None) -> None:
