@@ -143,6 +143,7 @@ class StatementView(BaseModel):
     """
 
     descriptor: str
+    merchant_tax_id: str | None = Field(description="Look the merchant up with this.")
     count: int
     posted_weekday: str = Field(description="The day the statement shows them under: Monday.")
     charges: list[StatementCharge] = Field(description="Earliest first.")
@@ -151,7 +152,12 @@ class StatementView(BaseModel):
 
 
 class ChargesExplained(BaseModel):
-    """What explains those charges. A caller says it only once the customer asks or doubts."""
+    """What explains those charges: when they were really made.
+
+    It is not part of the answer to a verification. A caller asks for it, with
+    the merchant lookup, only once the customer asks or doubts, so nothing in
+    its hands before that says when or where the purchases were made.
+    """
 
     descriptor: str
     merchant_tax_id: str | None = Field(description="Look the merchant up with this.")
@@ -165,13 +171,18 @@ class ChargesExplained(BaseModel):
 class Overview(BaseModel):
     """What a caller needs right after verifying the customer, so it asks for nothing more.
 
-    It comes in the order of the conversation: first what the statement shows
-    (`turn_1`), then, only if the customer asks, what explains it (`reveal`).
+    `turn_1` is what the statement shows and nothing more: no merchant name
+    and no day of purchase. What explains the charges is asked for separately.
     """
 
     customer: CustomerProfile
     turn_1: list[StatementView]
-    reveal: list[ChargesExplained]
+
+
+class ExplanationResponse(BaseModel):
+    """When the customer's repeated charges were made, for each descriptor."""
+
+    charges: list[ChargesExplained]
 
 
 class BlockCardRequest(BaseModel):
