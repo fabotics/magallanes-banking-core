@@ -2,11 +2,20 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CallSummaryRequest(BaseModel):
     """A short written summary of the call, for the customer to keep."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "summary": "We reviewed four charges and blocked the card ending in 4821.",
+                "language": "es",
+            }
+        }
+    )
 
     summary: str = Field(min_length=1, max_length=1000, description="Plain text, a few lines.")
     language: Literal["es", "en"] | None = Field(
@@ -25,6 +34,8 @@ class ConversationEnded(BaseModel):
     Platforms shape this notice differently. The ID is read from the top
     level, or from an object called `data`, which is where some put it.
     """
+
+    model_config = ConfigDict(json_schema_extra={"example": {"conversation_id": "conv_123"}})
 
     conversation_id: str | None = None
     data: dict | None = None

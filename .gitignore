@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local environments and secrets of this project
+.env.*
+!.env.example
+.venv*/
+
+# Hosting, editors and the operating system
+.vercel/
+.idea/
+.vscode/
+.DS_Store

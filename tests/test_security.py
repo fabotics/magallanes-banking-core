@@ -72,3 +72,37 @@ def test_unknown_path_and_bad_body_use_the_error_shape(client: TestClient) -> No
     assert response.status_code == 422
     assert response.json()["error"] == "invalid_request"
     assert "document_number" in response.json()["message"]
+
+
+def test_an_unexpected_error_uses_the_error_shape_and_says_nothing(app: FastAPI) -> None:
+    @app.get("/broken")
+    def broken() -> None:
+        raise RuntimeError("a detail that must not leave the server")
+
+    response = TestClient(app, raise_server_exceptions=False).get("/broken")
+    assert response.status_code == 500
+    assert response.json()["error"] == "internal_error"
+    assert "detail" not in response.text
+
+
+def test_the_docs_declare_the_api_key_and_describe_every_group(app: FastAPI) -> None:
+    spec = app.openapi()
+    scheme = spec["components"]["securitySchemes"]["APIKeyHeader"]
+    assert (scheme["in"], scheme["name"]) == ("header", "X-API-Key")
+    described = {tag["name"] for tag in spec["tags"]}
+    for path, operations in spec["paths"].items():
+        for operation in operations.values():
+            assert set(operation["tags"]) <= described, path
+            assert operation["summary"] and operation["description"], path
+            if path.startswith("/v1"):
+                assert operation["security"] == [{"APIKeyHeader": []}], path
+
+
+def test_every_request_body_has_an_example(app: FastAPI) -> None:
+    spec = app.openapi()
+    for path, operations in spec["paths"].items():
+        for operation in operations.values():
+            body = operation.get("requestBody")
+            if body:
+                name = body["content"]["application/json"]["schema"]["$ref"].split("/")[-1]
+                assert "example" in spec["components"]["schemas"][name], path

@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CaseRequest(BaseModel):
@@ -12,6 +12,17 @@ class CaseRequest(BaseModel):
     callback or a meeting. `category` says what it is for the bank: a problem
     to solve (`service`) or a wish to buy something (`sales_lead`).
     """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "type": "handoff",
+                "summary": "Wants to talk to a person about a charge.",
+                "category": "service",
+                "conversation_id": "conv_123",
+            }
+        }
+    )
 
     type: Literal["fraud", "handoff", "complaint", "callback", "meeting"]
     summary: str = Field(description="What happened, so the customer never repeats the story.")
@@ -65,6 +76,8 @@ class RoutesResponse(BaseModel):
 
 class ReviewRequest(BaseModel):
     """The customer's answer after their charges were explained to them."""
+
+    model_config = ConfigDict(json_schema_extra={"example": {"outcome": "recognised"}})
 
     outcome: Literal["recognised", "not_recognised"] = Field(
         description="recognised: the charges are theirs. not_recognised: they said, after the "
