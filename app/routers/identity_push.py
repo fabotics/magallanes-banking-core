@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from app import audit, confirmations, crm_sync, waiting
+from app import audit, confirmations, crm_sync, overview, waiting
 from app.clock import utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, get_repository
@@ -130,5 +130,8 @@ def confirmation_status(
         repository.update(confirmations.TABLE, {"id": confirmation["id"]}, {"session_token": token})
         crm_sync.noted(request, crm_sync.customer_verified(settings, customer))
     return PushStatusResponse(
-        status="approved", session_token=token, first_name=customer["first_name"]
+        status="approved",
+        session_token=token,
+        first_name=customer["first_name"],
+        overview=overview.after_verification(repository, customer),
     )

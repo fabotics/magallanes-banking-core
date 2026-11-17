@@ -23,12 +23,15 @@ def test_correct_details_open_a_15_minute_session(
     client: TestClient, repository: InMemoryRepository
 ) -> None:
     result = verify(client, conversation_id="conv-1")
+    overview = result.pop("overview")
     assert result == {
         "verified": True,
         "locked": False,
         "session_token": result["session_token"],
         "first_name": "Marta",
     }
+    # The profile and the movements come with the verification: no second and third call.
+    assert overview["customer"]["first_name"] == "Marta" and overview["charges"]["count"] == 10
     session = repository.select("verification_sessions", {"token": result["session_token"]})[0]
     assert session["customer_id"] == seed_id("customer/marta")
     assert session["conversation_id"] == "conv-1"

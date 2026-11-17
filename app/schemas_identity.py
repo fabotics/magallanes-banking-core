@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.schemas import Overview
+
 
 class PushRequest(BaseModel):
     """Ask the customer to confirm who they are in the bank's app.
@@ -63,3 +65,8 @@ class PushStatusResponse(BaseModel):
         "checks, so the caller never decides how long to wait.",
     )
     instruction: str | None = Field(default=None, description="The same, in a sentence.")
+    overview: Overview | None = Field(
+        default=None,
+        description="Once approved: the profile and the recent card movements, so the caller "
+        "does not have to ask for them.",
+    )

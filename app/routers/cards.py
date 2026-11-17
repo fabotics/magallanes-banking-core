@@ -5,48 +5,19 @@ reversible. No endpoint moves money.
 """
 
 import time
-from datetime import timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 
-from app import audit, statement
-from app.clock import BANK_TIMEZONE, parse_time, utc_now
+from app import audit, overview
+from app.clock import parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.errors import ApiError
-from app.schemas import (
-    BlockCardRequest,
-    BlockCardResponse,
-    CardTransaction,
-    TransactionsResponse,
-)
+from app.schemas import BlockCardRequest, BlockCardResponse, TransactionsResponse
 from app.security import require_session, session_from_request
 
 router = APIRouter(tags=["cards"])
-
-
-def to_transaction(row: Row, card_last4: str) -> CardTransaction:
-    """Shape a stored transaction for the response. Foreign charges keep their original amount.
-
-    Days and hours are given on the bank's clock, also in words.
-    """
-    fields = {
-        "id": row["id"],
-        "card_last4": card_last4,
-        "amount": row["amount"],
-        "currency": row["currency"],
-        "descriptor": row["descriptor"],
-        "merchant_tax_id": row["merchant_tax_id"],
-        "channel": row["channel"],
-        "country": row["country"],
-        **statement.local_fields(row),
-        "status": row["status"],
-    }
-    if row["original_currency"]:
-        fields["original_amount"] = row["original_amount"]
-        fields["original_currency"] = row["original_currency"]
-    return CardTransaction(**fields)
 
 
 @router.get(
@@ -68,22 +39,9 @@ def get_transactions(
     cope with a slow tool. It is configurable and off in tests.
     """
     time.sleep(settings.transactions_delay_seconds)
-    since = utc_now() - timedelta(days=days)
-    transactions = []
-    for card in repository.select("cards", {"customer_id": session["customer_id"]}):
-        for row in repository.select("transactions", {"card_id": card["id"]}):
-            is_recent = parse_time(row["transaction_at"]) >= since
-            status_matches = status == "all" or row["status"] == status
-            if is_recent and status_matches:
-                transactions.append(to_transaction(row, card["last4"]))
-    transactions.sort(key=lambda item: parse_time(item.transaction_at), reverse=True)
-    audit.note(request, count=len(transactions))
-    return TransactionsResponse(
-        count=len(transactions),
-        timezone=str(BANK_TIMEZONE),
-        repeated_charges=statement.repeated_charges([item.model_dump() for item in transactions]),
-        transactions=transactions,
-    )
+    answer = overview.movements(repository, session["customer_id"], days, status)
+    audit.note(request, count=answer.count)
+    return answer
 
 
 def block_reference(card: Row) -> str:

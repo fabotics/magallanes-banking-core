@@ -185,3 +185,44 @@ def test_an_approval_still_arrives_after_the_cap(
     confirmations.decide(repository, row, True, utc_now())
     answer = client.get(f"/v1/identity/push/{request_id}", headers=API_KEY).json()
     assert answer["status"] == "approved" and "next_step" not in answer
+
+
+def test_a_doubt_is_recorded_only_as_the_customers_answer_after_the_explanation(
+    client: TestClient, repository: InMemoryRepository, marta: dict
+) -> None:
+    said = client.post("/v1/cards/review", json={"outcome": "recognised"}, headers=marta).json()
+    assert said["outcome"] == "recognised" and "No block and no case" in said["next_step"]
+    no = client.post("/v1/cards/review", json={"outcome": "not_recognised"}, headers=marta).json()
+    assert "fraud case" in no["next_step"]
+    assert (
+        client.post("/v1/cards/review", json={"outcome": "unsure"}, headers=marta).status_code
+        == 422
+    )
+    assert (
+        client.post("/v1/cards/review", json={"outcome": "recognised"}, headers=API_KEY).status_code
+        == 401
+    )
+    outcomes = [row["outcome"] for row in repository.select("audit_log")]
+    assert "charges_recognised" in outcomes and "charges_not_recognised" in outcomes
+
+
+def test_a_case_opened_too_early_can_be_taken_back(
+    client: TestClient, repository: InMemoryRepository, marta: dict
+) -> None:
+    charges = client.get("/v1/cards/transactions", headers=marta).json()["transactions"]
+    disputed = [row["id"] for row in charges if row["merchant_tax_id"]]
+    case = {"type": "fraud", "category": "service", "summary": "No reconoce cargos.",
+            "transaction_ids": disputed}  # fmt: skip
+    number = client.post("/v1/cases", json=case, headers=marta).json()["case_number"]
+    assert all(repository.select("transactions", {"id": i})[0]["is_disputed"] for i in disputed)
+
+    taken_back = client.post(f"/v1/cases/{number}/withdraw", headers=marta).json()
+    assert taken_back == {"case_number": number, "status": "withdrawn"}
+    stored = repository.select("cases", {"case_number": number})[0]
+    assert stored["status"] == "closed" and "Retirado por el cliente" in stored["summary"]
+    assert not any(repository.select("transactions", {"id": i})[0]["is_disputed"] for i in disputed)
+    # Asking again is harmless, and nobody can take back another customer's case.
+    assert client.post(f"/v1/cases/{number}/withdraw", headers=marta).status_code == 200
+    assert stored["summary"].count("Retirado") == 1
+    emma = verify_in_app(client, repository, customer_id="35.897.932-7")
+    assert client.post(f"/v1/cases/{number}/withdraw", headers=emma).status_code == 404
