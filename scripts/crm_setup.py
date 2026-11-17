@@ -79,16 +79,23 @@ KINDS = {
     "reason": choices(REASONS),
     "channel": choices(CHANNELS),
 }
-# object, columns of the list view, the column the lead source is filtered on
+# The first four columns are what a card of the board shows under its title.
+SALE_COLUMNS = (
+    "OPPORTUNITY.NAME", "Contact_Name__c", "Monthly_Premium__c", "Channel__c",
+    "Last_Activity__c", "OPPORTUNITY.STAGE_NAME", "OPPORTUNITY.AMOUNT", "Quote_Number__c",
+    "Policy_Number__c", "Loss_Reason__c", "OPPORTUNITY.CLOSE_DATE", "OPPORTUNITY.LAST_UPDATE",
+)  # fmt: skip
+LEAD_COLUMNS = ("LEAD.CREATED_DATE", "FULL_NAME", "LEAD.COMPANY", "LEAD.STATUS", "LEAD.LEAD_SOURCE")
+# The board loads only the 200 newest records of its view and adds up what it loaded, so its
+# totals are right only for a view that fits. The funnel view leaves out the declined offers,
+# which the board has no column for anyway; the second view keeps every offer.
+# object, name, label, columns, lead source column, newest-first column, stage left out
 VIEWS = [
-    # The first four columns are what a card of the board shows under its title.
-    ("Opportunity", ("OPPORTUNITY.NAME", "Contact_Name__c", "Monthly_Premium__c", "Channel__c",
-                     "Last_Activity__c", "OPPORTUNITY.STAGE_NAME", "OPPORTUNITY.AMOUNT",
-                     "Quote_Number__c", "Policy_Number__c", "Loss_Reason__c",
-                     "OPPORTUNITY.CLOSE_DATE", "OPPORTUNITY.LAST_UPDATE"),
-     "OPPORTUNITY.LEAD_SOURCE", "LastModifiedDate"),
-    ("Lead", ("LEAD.CREATED_DATE", "FULL_NAME", "LEAD.COMPANY", "LEAD.STATUS",
-              "LEAD.LEAD_SOURCE"), "LEAD.LEAD_SOURCE", "CreatedDate"),
+    ("Opportunity", VIEW, "Voice agent funnel", SALE_COLUMNS,
+     "OPPORTUNITY.LEAD_SOURCE", "LastModifiedDate", "Declined"),
+    ("Opportunity", f"{VIEW}_all", "Voice agent funnel - all", SALE_COLUMNS,
+     "OPPORTUNITY.LEAD_SOURCE", "LastModifiedDate", None),
+    ("Lead", VIEW, "Voice agent funnel", LEAD_COLUMNS, "LEAD.LEAD_SOURCE", "CreatedDate", None),
 ]  # fmt: skip
 
 
@@ -146,6 +153,27 @@ def add_lead_source(settings: Settings) -> None:
         metadata(settings, "updateMetadata", item("StandardValueSet", "LeadSource", body))
 
 
+def list_views(settings: Settings) -> None:
+    """Create or update the list views of the funnel, newest first."""
+    for kind, name, label, columns, source_column, newest, left_out in VIEWS:
+        shown = "".join(f"<columns>{column}</columns>" for column in columns)
+        only = (
+            f"<filters><field>{source_column}</field><operation>equals</operation>"
+            f"<value>{crm_sync.SOURCE}</value></filters>"
+        )
+        if left_out:
+            only += (
+                "<filters><field>OPPORTUNITY.STAGE_NAME</field><operation>notEqual</operation>"
+                f"<value>{left_out}</value></filters>"
+            )
+        body = f"{shown}<filterScope>Everything</filterScope>{only}<label>{label}</label>"
+        metadata(settings, "upsertMetadata", item("ListView", f"{kind}.{name}", body))
+        # Newest first. This is a preference of the user the app signs in as.
+        order = {"orderedBy": [{"fieldApiName": newest, "isAscending": False}]}
+        crm.call(settings, "PATCH", f"/ui-api/list-preferences/{kind}/{name}", json=order)
+    print("list views: the funnel (without declined offers), all offers, and leads")
+
+
 def main() -> None:
     """Create or update everything, in the order the pieces depend on each other."""
     settings = get_settings()
@@ -176,20 +204,7 @@ def main() -> None:
     body = f"{allowed}<label>Voice agent funnel</label>{past_dates}"
     metadata(settings, "upsertMetadata", item("PermissionSet", VIEW, body))
     allow_administrators(settings)
-    for kind, columns, source_column, newest in VIEWS:
-        shown = "".join(f"<columns>{column}</columns>" for column in columns)
-        only = (
-            f"<filters><field>{source_column}</field><operation>equals</operation>"
-            f"<value>{crm_sync.SOURCE}</value></filters>"
-        )
-        body = (
-            f"{shown}<filterScope>Everything</filterScope>{only}<label>Voice agent funnel</label>"
-        )
-        metadata(settings, "upsertMetadata", item("ListView", f"{kind}.{VIEW}", body))
-        # Newest first. This is a preference of the user the app signs in as.
-        order = {"orderedBy": [{"fieldApiName": newest, "isAscending": False}]}
-        crm.call(settings, "PATCH", f"/ui-api/list-preferences/{kind}/{VIEW}", json=order)
-    print("list views: Voice agent funnel on Opportunity and Lead, newest first")
+    list_views(settings)
 
 
 def allow_administrators(settings: Settings) -> None:
