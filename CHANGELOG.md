@@ -4,6 +4,12 @@ One entry per release to `main`. Dates are the day the release was merged, in UT
 
 ## Unreleased
 
+## 0.23.0 (2026-11-17)
+
+- An identity confirmation lasts five minutes, so nobody is rushed through opening the app.
+- An approval of any request of the same conversation counts.
+- While a confirmation is pending the bank tells the caller to keep the customer company, not to resend or switch method.
+
 ## 0.22.0 (2026-11-17)
 
 - The answer to a verification is split the way the conversation goes: what the statement shows, then what explains it.

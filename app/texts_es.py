@@ -62,14 +62,14 @@ TEXTS = {
     "approve": "Sí, soy yo. Aprobar",
     "deny": "No soy yo. Rechazar",
     "confirm_footnote": "Si usted no está en una llamada con el banco, rechace la solicitud. "
-    "Vence a los 90 segundos.",
+    "Vence a los 5 minutos.",
     "approved_title": "Identidad confirmada",
     "approved_text": "Gracias. Ya puede volver a la llamada.",
     "denied_title": "Solicitud rechazada",
     "denied_text": "No se compartió ningún dato. Si no reconoce la llamada, cuelgue y llame al "
     "número que está en su tarjeta.",
     "expired_title": "Solicitud vencida",
-    "expired_text": "Pasaron más de 90 segundos. Pida una nueva en la llamada.",
+    "expired_text": "Pasaron más de 5 minutos. Pida una nueva en la llamada.",
     "gone_title": "No disponible",
     "request_gone": "Esta solicitud no existe o ya no está vigente.",
     "proposal_gone": "Esta propuesta no existe o ya no está vigente.",

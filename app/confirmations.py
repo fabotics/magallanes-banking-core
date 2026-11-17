@@ -4,7 +4,7 @@ A caller on the phone can read out data that someone else also knows. An
 approval inside the bank's own app, behind the customer's PIN, is a stronger
 proof, so it is the first choice and the spoken check is the fallback.
 
-A confirmation is pending for 90 seconds. The app shows a six digit code that
+A confirmation is pending for five minutes. The app shows a six digit code that
 also travels in the notification, so the customer can see both belong to the
 same request. The code is never returned through the API: the agent on the
 call must not be able to read it aloud.
@@ -21,7 +21,8 @@ from app.config import Settings
 from app.db import Repository, Row
 from app.messaging import send_telegram
 
-CONFIRMATION_LIFETIME = timedelta(seconds=90)
+# Long enough to find the phone, open the app and type the PIN without being rushed.
+CONFIRMATION_LIFETIME = timedelta(minutes=5)
 TABLE = "identity_confirmations"
 
 
@@ -127,14 +128,16 @@ def decide(repository: Repository, confirmation: Row, approved: bool, now: datet
     return repository.update(TABLE, {"id": confirmation["id"]}, values)[0]
 
 
-# How long a caller may keep asking. The first confirmation of a conversation may be checked
-# twice, a second one once. After that the bank says what to do instead of waiting again.
-CHECKS_ALLOWED = {"first": 2, "later": 1}
+# What a caller does after an answer that is not an approval. The customer is opening an app
+# and typing a PIN, which takes a person half a minute or more: the caller keeps them company
+# and asks, it does not rush, resend or jump to another way by itself.
+MAX_CHECKS = 8
 NEXT_STEPS = {
-    "check_again": "No answer yet. Check again once, without telling the customer to wait.",
-    "send_new_confirmation": "Stop checking this request. Tell the customer you do not see the "
-    "approval yet and that you are sending a new one. Send one new confirmation, then check "
-    "that one once.",
+    "ask_customer": "Not approved yet. Do not send anything new and do not offer another way. "
+    "Ask the customer, kindly, whether they were able to open the app and sign in or need a "
+    "little more time. Check again when they say they approved, or after they ask for more time.",
+    "send_new_confirmation": "This request ran out of time. Tell the customer, send one new "
+    "confirmation, and keep them company as before.",
     "offer_other_way": "Stop checking and send no more confirmations. Offer the customer the "
     "three spoken security questions now, or a callback from a person.",
 }
@@ -153,10 +156,29 @@ def is_first(repository: Repository, confirmation: Row) -> bool:
     return not any(row["created_at"] < confirmation["created_at"] for row in same_talk)
 
 
+def answered(repository: Repository, confirmation: Row) -> Row:
+    """Return the request that counts: this one, or an approved one of the same conversation.
+
+    A customer may approve an earlier request of the same conversation after a
+    newer one was sent. It is the same customer saying yes in the same app, so
+    that approval answers the newer request too.
+    """
+    if confirmation["status"] != "pending" or not confirmation["conversation_id"]:
+        return confirmation
+    same_talk = repository.select(TABLE, {"conversation_id": confirmation["conversation_id"]})
+    for other in same_talk:
+        same_customer = other["document_number"] == confirmation["document_number"]
+        if same_customer and other["status"] == "approved" and other["customer_id"]:
+            return other
+    return confirmation
+
+
 def next_step(status: str, first: bool, checks_done: int) -> str | None:
     """Return what the caller should do after this answer, or None once it is approved."""
     if status == "approved":
         return None
-    if status in ("denied", "expired") or not first:
-        return "offer_other_way" if status != "pending" or checks_done >= 1 else "check_again"
-    return "check_again" if checks_done < CHECKS_ALLOWED["first"] else "send_new_confirmation"
+    if status == "denied" or checks_done >= MAX_CHECKS:
+        return "offer_other_way"
+    if status == "expired":
+        return "send_new_confirmation" if first else "offer_other_way"
+    return "ask_customer"

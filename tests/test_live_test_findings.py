@@ -4,6 +4,8 @@ One verified customer per conversation, days and hours ready-made on the
 bank's clock, and a summary even when the customer hangs up.
 """
 
+from datetime import timedelta
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -144,34 +146,56 @@ def test_an_id_number_heard_with_noise_still_names_the_customer(
     assert row["customer_id"] == seed_id("customer/sofia")
 
 
-def test_the_bank_counts_the_checks_and_says_what_to_do_next(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch
+def test_while_the_customer_signs_in_the_caller_keeps_them_company(
+    client: TestClient, repository: InMemoryRepository
 ) -> None:
-    held: list[int] = []
-
-    def no_waiting(read, settled, seconds):  # noqa: ANN001, ANN202
-        held.append(seconds)
-        return read()
-
-    monkeypatch.setattr("app.waiting.until_settled", no_waiting)
-
     def check(request_id: str) -> dict:
-        return client.get(f"/v1/identity/push/{request_id}?wait=10", headers=API_KEY).json()
+        return client.get(f"/v1/identity/push/{request_id}", headers=API_KEY).json()
 
     named = {"customer_id": "35.628.194-2", "conversation_id": TALK}
     first = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
-    assert check(first)["next_step"] == "check_again"
-    second_check = check(first)
-    assert second_check["next_step"] == "send_new_confirmation"
-    assert "sending a new one" in second_check["instruction"]
-    # After the cap the answer comes at once: the request is not held any more.
-    assert check(first)["next_step"] == "send_new_confirmation" and held == [10, 10, 0]
-    # The new confirmation gets one check, then the other way is offered.
-    again = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
-    only_check = check(again)
-    assert only_check["status"] == "pending" and only_check["next_step"] == "offer_other_way"
-    assert "three spoken security questions" in only_check["instruction"]
-    assert check(again)["next_step"] == "offer_other_way" and held == [10, 10, 0, 10, 0]
+    # Pending is not a failure: the caller asks how the customer is getting on, again and again.
+    for _ in range(3):
+        answer = check(first)
+        assert answer["status"] == "pending" and answer["next_step"] == "ask_customer"
+    assert "need a little more time" in answer["instruction"]
+    # Only after many checks does the bank say to offer another way.
+    for _ in range(4):
+        check(first)
+    assert check(first)["next_step"] == "offer_other_way"
+
+
+def test_approving_an_earlier_request_answers_the_newer_one(
+    client: TestClient, repository: InMemoryRepository
+) -> None:
+    # What happened in a real call: a second request was sent while the customer was still
+    # signing in, and they approved the first one. That approval must count.
+    named = {"customer_id": "35.628.194-2", "conversation_id": TALK}
+    first = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
+    second = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
+    row = repository.select(confirmations.TABLE, {"id": first})[0]
+    confirmations.decide(repository, row, True, utc_now())
+    answer = client.get(f"/v1/identity/push/{second}", headers=API_KEY).json()
+    assert answer["status"] == "approved" and answer["first_name"] == "Daniel"
+    # An approval in another conversation, or for another customer, answers nothing here.
+    other = {"customer_id": "35.628.194-2", "conversation_id": "another"}
+    third = client.post("/v1/identity/push", json=other, headers=API_KEY).json()["request_id"]
+    assert client.get(f"/v1/identity/push/{third}", headers=API_KEY).json()["status"] == "pending"
+
+
+def test_a_request_that_ran_out_of_time_is_sent_again_once(
+    client: TestClient, repository: InMemoryRepository
+) -> None:
+    named = {"customer_id": "35.628.194-2", "conversation_id": TALK}
+    past = (utc_now() - timedelta(minutes=6)).isoformat()
+    first = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
+    repository.update(confirmations.TABLE, {"id": first}, {"expires_at": past})
+    answer = client.get(f"/v1/identity/push/{first}", headers=API_KEY).json()
+    assert answer["status"] == "expired" and answer["next_step"] == "send_new_confirmation"
+    second = client.post("/v1/identity/push", json=named, headers=API_KEY).json()["request_id"]
+    repository.update(confirmations.TABLE, {"id": second}, {"expires_at": past})
+    answer = client.get(f"/v1/identity/push/{second}", headers=API_KEY).json()
+    assert answer["next_step"] == "offer_other_way"
 
 
 def test_an_approval_still_arrives_after_the_cap(
