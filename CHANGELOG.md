@@ -4,6 +4,11 @@ One entry per release to `main`. Dates are the day the release was merged, in UT
 
 ## Unreleased
 
+## 0.26.0 (2026-11-17)
+
+- The answer to a verification holds only what the statement shows: no day of purchase and no merchant.
+- When the charges were really made is a question of its own, `GET /v1/cards/charges/explanation`.
+
 ## 0.25.0 (2026-11-17)
 
 - Recording that a customer wants an offer also creates and sends the proposal, in one step.

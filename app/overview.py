@@ -3,8 +3,8 @@
 A voice agent that verifies the customer and then asks for the profile and for
 the card movements makes three calls in a row, and the customer waits through
 each one. So the answer to a successful verification already carries the
-profile and the repeated charges, split the way the conversation goes: first
-what the statement shows, then what explains it.
+profile and what the statement shows. What explains the charges (the day
+they were really made) is a separate question, asked when the customer doubts.
 """
 
 from datetime import timedelta
@@ -103,7 +103,9 @@ WHY = (
 )
 
 
-def statement_views(charges: TransactionsResponse) -> tuple[list[StatementView], list]:
+def statement_views(
+    charges: TransactionsResponse,
+) -> tuple[list[StatementView], list[ChargesExplained]]:
     """Split the repeated charges into what the statement shows and what explains it."""
     views, explained = [], []
     for group in charges.repeated_charges:
@@ -117,6 +119,7 @@ def statement_views(charges: TransactionsResponse) -> tuple[list[StatementView],
         views.append(
             StatementView(
                 descriptor=group.descriptor,
+                merchant_tax_id=group.merchant_tax_id,
                 count=group.count,
                 posted_weekday=posted,
                 charges=lines,
@@ -139,9 +142,18 @@ def statement_views(charges: TransactionsResponse) -> tuple[list[StatementView],
 
 
 def after_verification(repository: Repository, customer: Row) -> Overview:
-    """Return the profile and the statement of a customer who was just verified."""
-    turn_1, reveal = statement_views(movements(repository, customer["id"]))
-    return Overview(customer=profile(repository, customer), turn_1=turn_1, reveal=reveal)
+    """Return the profile and the statement of a customer who was just verified.
+
+    Only what the statement shows. When the purchases were really made is not
+    here: see `explained`.
+    """
+    turn_1, _ = statement_views(movements(repository, customer["id"]))
+    return Overview(customer=profile(repository, customer), turn_1=turn_1)
+
+
+def explained(repository: Repository, customer_id: str) -> list[ChargesExplained]:
+    """Return when the customer's repeated charges were really made and why the dates differ."""
+    return statement_views(movements(repository, customer_id))[1]
 
 
 def first_route(customer: Row) -> str:

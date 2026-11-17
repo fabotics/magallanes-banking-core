@@ -74,7 +74,8 @@ def test_an_approval_opens_the_same_session_as_the_spoken_check(
     }
     assert overview["customer"]["segment"] == "preferred"
     # First what the statement shows: no merchant and no day of purchase in it.
-    (shown,), (explained,) = overview["turn_1"], overview["reveal"]
+    (shown,) = overview["turn_1"]
+    assert "reveal" not in overview
     assert shown["total"] == 34900 and shown["posted_weekday"] == "Monday"
     assert [line["time"] for line in shown["charges"]] == [
         "9:52 pm",
@@ -82,8 +83,11 @@ def test_an_approval_opens_the_same_session_as_the_spoken_check(
         "11:14 pm",
         "11:58 pm",
     ]
-    assert "Saturday" not in str(shown) and "tax" not in str(shown)
-    # Then what explains it, for when the customer asks.
+    assert "Saturday" not in str(overview) and shown["merchant_tax_id"] == "66871234-7"
+    # What explains it is a question of its own, for when the customer asks.
+    headers = {**API_KEY, "X-Session-Token": result["session_token"]}
+    (explained,) = client.get("/v1/cards/charges/explanation", headers=headers).json()["charges"]
+    assert explained["first_time"] == "9:52 pm" and explained["last_time"] == "11:58 pm"
     assert explained["purchased_on"][0].startswith("Saturday ")
     assert explained["merchant_tax_id"] == "66871234-7"
     assert "post a day or two later" in explained["why_the_dates_differ"]
