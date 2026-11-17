@@ -65,11 +65,14 @@ def test_an_approval_opens_the_same_session_as_the_spoken_check(
     request_id = request_push(client)["request_id"]
     answer(repository, request_id, approved=True)
     result = status(client, request_id)
+    overview = result.pop("overview")
     assert result == {
         "status": "approved",
         "session_token": result["session_token"],
         "first_name": "Marta",
     }
+    assert overview["customer"]["segment"] == "preferred"
+    assert overview["charges"]["repeated_charges"][0]["total"] == 34900
     headers = {**API_KEY, "X-Session-Token": result["session_token"]}
     assert client.get("/v1/customers/me", headers=headers).status_code == 200
     # Asking again returns the same session instead of opening a second one.

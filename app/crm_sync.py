@@ -170,3 +170,22 @@ def stage_changed(settings: Settings, offer_id: str, stage: str, **fields: str) 
             crm.upsert(settings, "Lead", "Offer_Reference__c", offer_id, working)
 
     return mirrored(settings, step)
+
+
+def case_withdrawn(settings: Settings, case_number: str) -> str:
+    """Close the CRM case that carries this bank case number, when the customer withdraws it.
+
+    The case in the CRM was written by the caller, with the bank's case number
+    at the start of its subject, so that is how it is found.
+    """
+
+    def step() -> None:
+        found_cases = crm.query(
+            settings, f"SELECT Id, Subject FROM Case WHERE Subject LIKE '{case_number}%'"
+        )
+        for case in found_cases:
+            subject = f"{case.get('Subject') or case_number} (withdrawn)"[:255]
+            closed = {"Status": "Closed", "Subject": subject}
+            crm.call(settings, "PATCH", f"/sobjects/Case/{case['Id']}", json=closed)
+
+    return mirrored(settings, step)

@@ -11,7 +11,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request
 
-from app import audit, crm_sync
+from app import audit, crm_sync, overview
 from app.clock import parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
@@ -136,4 +136,9 @@ def verify_identity(
     token = open_session(repository, customer, body.conversation_id, now)
     audit.note(request, customer_id=customer["id"], outcome="verified")
     crm_sync.noted(request, crm_sync.customer_verified(settings, customer))
-    return VerifyResponse(verified=True, session_token=token, first_name=customer["first_name"])
+    return VerifyResponse(
+        verified=True,
+        session_token=token,
+        first_name=customer["first_name"],
+        overview=overview.after_verification(repository, customer),
+    )
