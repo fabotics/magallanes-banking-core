@@ -89,7 +89,7 @@ def sign(
     confirm_in_writing(repository, settings, policy, proposal, evidence.get("language"))
     # The sale is closed in the CRM too, on the day of the signature.
     crm_sync.stage_changed(
-        settings, proposal["offer_id"], "Closed Won",
+        settings, proposal["offer_id"], "Signed",
         Policy_Number__c=policy["policy_number"], CloseDate=bank_date(now).isoformat(),
     )  # fmt: skip
     return policy

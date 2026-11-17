@@ -4,10 +4,14 @@ Each step of the insurance sale already happens in the bank core. Right after
 the bank has stored it, the matching function here copies it to the CRM:
 
 - a verified customer becomes a Contact,
-- an offer becomes a Lead and an Opportunity in stage Offered, or Closed Lost
-  with the reason when the customer said no,
+- an offer becomes a Lead and an Opportunity: in stage Offered when the customer
+  wants the proposal, Interested when they want to read it first, and Declined
+  with the reason when they said no,
 - a proposal moves the Opportunity to Proposal Sent,
-- a signature moves it to Closed Won.
+- a signature moves it to Signed.
+
+The stages are the sales process of the CRM, in this order: Offered,
+Interested, Proposal Sent, Signed (won), Declined (lost).
 
 A failure is logged and reported as `failed`, never raised: the customer and
 the agent on the call must not notice that a copy could not be written.
@@ -20,8 +24,9 @@ from datetime import date
 from fastapi import Request
 
 from app import audit, crm
+from app.clock import bank_date, utc_now
 from app.config import Settings
-from app.db import Row
+from app.db import Repository, Row
 
 logger = logging.getLogger(__name__)
 SOURCE = "Voice agent"
@@ -33,6 +38,10 @@ LOSS_REASONS = {
     "already_insured": "Already insured",
     "other": "Other",
 }
+# The stage an offer starts in, by the answer the bank stored.
+FIRST_STAGE = {"accepted": "Offered", "info_requested": "Interested", "declined": "Declined"}
+# How the customer was named when the conversation started, as the CRM calls the channel.
+CHANNELS = {"reference": "App", "phone": "Phone"}
 # The account every personal customer hangs from, found once per process.
 found: dict[str, str] = {}
 
@@ -84,15 +93,41 @@ def customer_verified(settings: Settings, customer: Row) -> str:
     return mirrored(settings, lambda: contact(settings, customer))
 
 
+def today() -> str:
+    """Return today's date at the bank, as the CRM wants a date."""
+    return bank_date(utc_now()).isoformat()
+
+
+def channel_of(repository: Repository, conversation_id: str | None) -> str | None:
+    """Say which channel a conversation came through, when the bank's records show it.
+
+    The bank knows it only from how the customer was named at the start: by the
+    app's reference or by the phone the call came from. Otherwise it is unknown.
+    """
+    if not conversation_id:
+        return None
+    for row in repository.select("audit_log", {"conversation_id": conversation_id}):
+        if row["detail"].get("named_by") in CHANNELS:
+            return CHANNELS[row["detail"]["named_by"]]
+    return None
+
+
 def offer_logged(
-    settings: Settings, customer: Row, offer: Row, product: Row, valid_until: date, reason: str
+    settings: Settings,
+    customer: Row,
+    offer: Row,
+    product: Row,
+    valid_until: date,
+    reason: str,
+    channel: str | None = None,
 ) -> str:
-    """Mirror an offer: a Lead and an Opportunity. A declined one is born Closed Lost."""
+    """Mirror an offer: a Lead and an Opportunity. A declined one is born Declined."""
 
     def step() -> None:
         declined = offer["customer_response"] == "declined"
         person = contact(settings, customer)
         name = {"FirstName": customer["first_name"], "LastName": customer["last_name"]}
+        full_name = f"{customer['first_name']} {customer['last_name']}"
         lead = {
             **name,
             "Company": product["name"],
@@ -102,13 +137,17 @@ def offer_logged(
         }
         crm.upsert(settings, "Lead", "Offer_Reference__c", offer["id"], lead)
         deal = {
-            "Name": f"{product['name']} - {customer['first_name']} {customer['last_name']}",
+            "Name": f"{full_name} - {product['name']}",
             "AccountId": account_id(settings),
-            "StageName": "Closed Lost" if declined else "Offered",
+            "StageName": FIRST_STAGE[offer["customer_response"]],
             "Amount": float(product["monthly_premium"]) * 12,
             "CloseDate": valid_until.isoformat(),
             "LeadSource": SOURCE,
-            "Description": f"Quote {offer.get('quote_number') or '-'}",
+            "Contact_Name__c": full_name,
+            "Monthly_Premium__c": float(product["monthly_premium"]),
+            "Quote_Number__c": offer.get("quote_number"),
+            "Channel__c": channel,
+            "Last_Activity__c": today(),
         }
         if declined:
             deal["Loss_Reason__c"] = LOSS_REASONS.get(reason, "Other")
@@ -124,7 +163,7 @@ def stage_changed(settings: Settings, offer_id: str, stage: str, **fields: str) 
     """Move the Opportunity of an offer to another stage, with any fields that go with it."""
 
     def step() -> None:
-        change = {"StageName": stage, **fields}
+        change = {"StageName": stage, "Last_Activity__c": today(), **fields}
         crm.upsert(settings, "Opportunity", "Offer_Reference__c", offer_id, change)
         if stage == "Proposal Sent":
             working = {"Status": "Working - Contacted"}
