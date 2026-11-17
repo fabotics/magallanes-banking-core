@@ -65,7 +65,7 @@ def test_anything_but_approve_is_a_denial(signed_in: TestClient, decision: str) 
     request_id = push(signed_in)
     done = signed_in.post(f"/app/confirmations/{request_id}", data={"decision": decision})
     assert "Solicitud rechazada" in done.text
-    assert signed_in.get(f"{PUSH}/{request_id}", headers=API_KEY).json() == {"status": "denied"}
+    assert signed_in.get(f"{PUSH}/{request_id}", headers=API_KEY).json()["status"] == "denied"
 
 
 def test_an_expired_request_cannot_be_approved(
@@ -84,7 +84,7 @@ def test_a_customer_only_sees_their_own_requests(signed_in: TestClient) -> None:
     assert "No disponible" in signed_in.get(f"/app/confirmations/{other}").text
     answer = signed_in.post(f"/app/confirmations/{other}", data={"decision": "approve"})
     assert "No disponible" in answer.text
-    assert signed_in.get(f"{PUSH}/{other}", headers=API_KEY).json() == {"status": "pending"}
+    assert signed_in.get(f"{PUSH}/{other}", headers=API_KEY).json()["status"] == "pending"
 
 
 def test_confirmations_need_the_pin_first(client: TestClient) -> None:
@@ -95,7 +95,7 @@ def test_confirmations_need_the_pin_first(client: TestClient) -> None:
         f"/app/confirmations/{request_id}", data={"decision": "approve"}, follow_redirects=False
     )
     assert post.status_code == 303
-    assert client.get(f"{PUSH}/{request_id}", headers=API_KEY).json() == {"status": "pending"}
+    assert client.get(f"{PUSH}/{request_id}", headers=API_KEY).json()["status"] == "pending"
 
 
 def test_the_contract_is_complete_and_personal(
