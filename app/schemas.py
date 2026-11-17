@@ -3,6 +3,8 @@
 Responses are small and speakable, because the caller is a voice agent.
 """
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -38,8 +40,13 @@ class VerifyResponse(BaseModel):
     attempts_remaining: int | None = None
     overview: "Overview | None" = Field(
         default=None,
-        description="When verified: the profile and the recent card movements, so the caller "
+        description="When verified: the profile and what the statement shows, so the caller "
         "does not have to ask for them.",
+    )
+    review_route: Literal["review", "handoff"] | None = Field(
+        default=None,
+        description="When verified: where the conversation goes next. handoff for a customer "
+        "the bank serves in person.",
     )
 
 
@@ -121,11 +128,50 @@ class TransactionsResponse(BaseModel):
     transactions: list[CardTransaction]
 
 
+class StatementCharge(BaseModel):
+    """One charge the way the statement lists it: its hour and its amount."""
+
+    time: str = Field(description="Hour it was made at the bank, 24 hour clock: 21:52.")
+    amount: float
+
+
+class StatementView(BaseModel):
+    """Charges that share a descriptor, exactly as the customer sees them on the statement.
+
+    This is what a caller says first. It carries no merchant name and no day
+    of purchase: the customer has not seen either.
+    """
+
+    descriptor: str
+    count: int
+    posted_weekday: str = Field(description="The day the statement shows them under: Monday.")
+    charges: list[StatementCharge] = Field(description="Earliest first.")
+    total: float
+    currency: str
+
+
+class ChargesExplained(BaseModel):
+    """What explains those charges. A caller says it only once the customer asks or doubts."""
+
+    descriptor: str
+    merchant_tax_id: str | None = Field(description="Look the merchant up with this.")
+    purchased_on: list[str] = Field(description="The day or days they were made, in words.")
+    first_time: str
+    last_time: str
+    posted_on: list[str] = Field(description="The day or days the bank posted them, in words.")
+    why_the_dates_differ: str
+
+
 class Overview(BaseModel):
-    """What a caller needs right after verifying the customer, so it asks for nothing more."""
+    """What a caller needs right after verifying the customer, so it asks for nothing more.
+
+    It comes in the order of the conversation: first what the statement shows
+    (`turn_1`), then, only if the customer asks, what explains it (`reveal`).
+    """
 
     customer: CustomerProfile
-    charges: TransactionsResponse = Field(description="Card movements of the last 30 days.")
+    turn_1: list[StatementView]
+    reveal: list[ChargesExplained]
 
 
 class BlockCardRequest(BaseModel):

@@ -134,4 +134,5 @@ def confirmation_status(
         session_token=token,
         first_name=customer["first_name"],
         overview=overview.after_verification(repository, customer),
+        review_route=overview.first_route(customer),
     )

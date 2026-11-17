@@ -3,7 +3,8 @@
 A voice agent that verifies the customer and then asks for the profile and for
 the card movements makes three calls in a row, and the customer waits through
 each one. So the answer to a successful verification already carries the
-profile and the recent movements, with the repeated charges added up.
+profile and the repeated charges, split the way the conversation goes: first
+what the statement shows, then what explains it.
 """
 
 from datetime import timedelta
@@ -13,9 +14,12 @@ from app.clock import parse_time, utc_now
 from app.db import Repository, Row
 from app.schemas import (
     CardTransaction,
+    ChargesExplained,
     CustomerProfile,
     HeldProduct,
     Overview,
+    StatementCharge,
+    StatementView,
     TransactionsResponse,
 )
 
@@ -93,9 +97,50 @@ def movements(
     )
 
 
+WHY = (
+    "Card purchases often post a day or two later, when the merchant sends them to the bank, "
+    "so a purchase made on one day can show under a later one."
+)
+
+
+def statement_views(charges: TransactionsResponse) -> tuple[list[StatementView], list]:
+    """Split the repeated charges into what the statement shows and what explains it."""
+    views, explained = [], []
+    for group in charges.repeated_charges:
+        same = [item for item in charges.transactions if item.descriptor == group.descriptor]
+        same.sort(key=lambda item: parse_time(item.transaction_at))
+        lines = [StatementCharge(time=item.purchased_time, amount=item.amount) for item in same]
+        posted = (group.posted_on or group.purchased_on)[-1].split()[0]
+        views.append(
+            StatementView(
+                descriptor=group.descriptor,
+                count=group.count,
+                posted_weekday=posted,
+                charges=lines,
+                total=group.total,
+                currency=group.currency,
+            )  # fmt: skip
+        )
+        explained.append(
+            ChargesExplained(
+                descriptor=group.descriptor,
+                merchant_tax_id=group.merchant_tax_id,
+                purchased_on=group.purchased_on,
+                first_time=group.first_time,
+                last_time=group.last_time,
+                posted_on=group.posted_on,
+                why_the_dates_differ=WHY,
+            )  # fmt: skip
+        )
+    return views, explained
+
+
 def after_verification(repository: Repository, customer: Row) -> Overview:
-    """Return the profile and the recent movements of a customer who was just verified."""
-    return Overview(
-        customer=profile(repository, customer),
-        charges=movements(repository, customer["id"]),
-    )
+    """Return the profile and the statement of a customer who was just verified."""
+    turn_1, reveal = statement_views(movements(repository, customer["id"]))
+    return Overview(customer=profile(repository, customer), turn_1=turn_1, reveal=reveal)
+
+
+def first_route(customer: Row) -> str:
+    """Return where the conversation goes after verification: the review, or a person."""
+    return "handoff" if customer["is_vulnerable"] else "review"
