@@ -90,10 +90,11 @@ def confirmation_status(
     """Say where the confirmation stands. Once approved, hand over the session.
 
     With `wait`, the answer is held while the request is pending, so the
-    caller learns of the customer's answer without asking again. The bank
-    counts the checks: the first request of a conversation is held twice, a
-    later one once. After that the answer comes at once and `next_step` says
-    what to do instead: send a new confirmation, or offer another way.
+    caller learns of the customer's answer without asking again. An approval
+    of any request of the same conversation counts. While there is none,
+    `next_step` says what to do: ask the customer how they are getting on,
+    send a new request when this one ran out of time, or, after many checks
+    or a denial, offer another way.
     """
     filters = {"id": str(request_id)}
     found = repository.select(confirmations.TABLE, filters)
@@ -101,11 +102,12 @@ def confirmation_status(
         raise ApiError(404, "request_not_found", "No such confirmation request.")
     first = confirmations.is_first(repository, found[0])
     earlier = confirmations.checks_so_far(repository, request.url.path)
-    allowed = confirmations.CHECKS_ALLOWED["first" if first else "later"]
     confirmation = waiting.until_settled(
-        lambda: repository.select(confirmations.TABLE, filters)[0],
+        lambda: confirmations.answered(
+            repository, repository.select(confirmations.TABLE, filters)[0]
+        ),
         lambda row: confirmations.current_status(row, utc_now()) != "pending",
-        wait if earlier < allowed else 0,
+        wait if earlier < confirmations.MAX_CHECKS else 0,
     )
     now = utc_now()
     status = confirmations.current_status(confirmation, now)

@@ -69,7 +69,7 @@ class PushStatusResponse(BaseModel):
         default=None, description="Send it back in the X-Session-Token header. Valid 15 minutes."
     )
     first_name: str | None = None
-    next_step: Literal["check_again", "send_new_confirmation", "offer_other_way"] | None = Field(
+    next_step: Literal["ask_customer", "send_new_confirmation", "offer_other_way"] | None = Field(
         default=None,
         description="What to do after a status that is not approved. The bank counts the "
         "checks, so the caller never decides how long to wait.",

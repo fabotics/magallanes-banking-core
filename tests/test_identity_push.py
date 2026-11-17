@@ -33,14 +33,14 @@ def answer(repository: InMemoryRepository, request_id: str, approved: bool) -> N
     confirmations.decide(repository, confirmation, approved, utc_now())
 
 
-def test_a_request_is_pending_for_90_seconds_and_hides_the_code(
+def test_a_request_is_pending_for_five_minutes_and_hides_the_code(
     client: TestClient, repository: InMemoryRepository
 ) -> None:
     result = request_push(client)
     assert result == {
         "status": "pending",
         "request_id": result["request_id"],
-        "expires_in_seconds": 90,
+        "expires_in_seconds": 300,
     }
     row = repository.select(confirmations.TABLE, {"id": result["request_id"]})[0]
     assert row["customer_id"] == seed_id("customer/marta")
@@ -119,7 +119,7 @@ def test_an_unknown_document_gets_the_same_answer_and_no_message(
     client: TestClient, repository: InMemoryRepository, with_bot: None, telegram: list[dict]
 ) -> None:
     result = request_push(client, "11.111.111-1")
-    assert result["status"] == "pending" and result["expires_in_seconds"] == 90
+    assert result["status"] == "pending" and result["expires_in_seconds"] == 300
     assert telegram == []
     assert repository.select(confirmations.TABLE)[0]["customer_id"] is None
 

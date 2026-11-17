@@ -62,14 +62,14 @@ TEXTS = {
     "approve": "Yes, it is me. Approve",
     "deny": "It is not me. Reject",
     "confirm_footnote": "If you are not on a call with the bank, reject the request. It "
-    "expires after 90 seconds.",
+    "expires after 5 minutes.",
     "approved_title": "Identity confirmed",
     "approved_text": "Thank you. You can go back to the call.",
     "denied_title": "Request rejected",
     "denied_text": "No data was shared. If you do not recognize the call, hang up and call the "
     "number on your card.",
     "expired_title": "Request expired",
-    "expired_text": "More than 90 seconds went by. Ask for a new one on the call.",
+    "expired_text": "More than 5 minutes went by. Ask for a new one on the call.",
     "gone_title": "Not available",
     "request_gone": "This request does not exist or is no longer valid.",
     "proposal_gone": "This proposal does not exist or is no longer valid.",
