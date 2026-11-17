@@ -12,6 +12,7 @@ from datetime import datetime
 from app.clock import BANK_TIMEZONE, parse_time
 from app.formatting import long_date
 
+TIMEZONE_NAME = str(BANK_TIMEZONE)
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
 
