@@ -61,7 +61,7 @@ def test_an_unknown_id_number_still_gets_the_same_answer_as_a_known_one(
     client: TestClient, repository: InMemoryRepository
 ) -> None:
     result = push(client, customer_id="1-9")
-    assert result["status"] == "pending" and result["expires_in_seconds"] == 90
+    assert result["status"] == "pending" and result["expires_in_seconds"] == 300
     assert stored(repository, result["request_id"])["customer_id"] is None
 
 
