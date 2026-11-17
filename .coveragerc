@@ -1,0 +1,4 @@
+# What the coverage report measures: the code of the API, the seed data and the dashboard metrics.
+[run]
+source = app, seed, dashboard
+omit = dashboard/streamlit_app.py

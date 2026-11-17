@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class OfferedProduct(BaseModel):
@@ -32,6 +32,16 @@ class EligibilityResponse(BaseModel):
 
 class OfferRequest(BaseModel):
     """Record that a product was offered and what the customer answered."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "product_code": "PURCHASE",
+                "outcome": "sent",
+                "conversation_id": "conv_123",
+            }
+        }
+    )
 
     product_code: str
     outcome: Literal["sent", "interested", "declined"] | None = Field(
@@ -70,6 +80,15 @@ class OfferResponse(BaseModel):
 
 class ProposalRequest(BaseModel):
     """Send the proposal for an offer the customer accepted or asked details about."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "offer_id": "the offer_id returned by /v1/insurance/offers",
+                "language": "es",
+            }
+        }
+    )
 
     offer_id: str
     channel: Literal["email"] = "email"

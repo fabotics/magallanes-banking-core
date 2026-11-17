@@ -9,13 +9,20 @@ customer has proven who they are.
 import secrets
 from typing import Annotated
 
-from fastapi import Depends, Header, Query, Request
+from fastapi import Depends, Header, Query, Request, Security
+from fastapi.security import APIKeyHeader
 
 from app import audit
 from app.clock import parse_time, utc_now
 from app.config import Settings, get_settings
 from app.db import Repository, Row, get_repository
 from app.errors import ApiError
+
+# Declaring the header as a security scheme gives `/docs` its Authorize button. The scheme
+# only reads the header: `require_api_key` decides, so the error keeps the API's own shape.
+api_key_header = APIKeyHeader(
+    name="X-API-Key", auto_error=False, description="The key of a known caller."
+)
 
 
 def api_key_matches(settings: Settings, provided: str | None) -> bool:
@@ -33,7 +40,7 @@ def api_key_matches(settings: Settings, provided: str | None) -> bool:
 
 def require_api_key(
     settings: Annotated[Settings, Depends(get_settings)],
-    x_api_key: Annotated[str | None, Header()] = None,
+    x_api_key: Annotated[str | None, Security(api_key_header)] = None,
 ) -> None:
     """Reject the request with HTTP 401 unless `X-API-Key` matches the configured key."""
     if not api_key_matches(settings, x_api_key):
