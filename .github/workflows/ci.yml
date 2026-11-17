@@ -3,13 +3,18 @@ name: CI
 on:
   pull_request:
     branches: [dev, main]
+  push:
+    branches: [dev, main]
+
+permissions:
+  contents: read
 
 jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -19,5 +24,7 @@ jobs:
         run: ruff check .
       - name: Format check
         run: ruff format --check .
-      - name: Tests
-        run: pytest -q
+      - name: Tests with coverage
+        run: pytest -q --cov --cov-report=term-missing:skip-covered --cov-fail-under=90
+      - name: Known vulnerabilities in dependencies
+        run: pip-audit -r requirements.txt

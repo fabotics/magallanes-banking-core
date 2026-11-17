@@ -3,11 +3,22 @@
 Responses are small and speakable, because the caller is a voice agent.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class VerifyRequest(BaseModel):
     """What the customer says to prove who they are."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "document_number": "31.415.926-8",
+                "card_last4": "4821",
+                "birth_year": 1986,
+                "conversation_id": "conv_123",
+            }
+        }
+    )
 
     document_number: str = Field(description="National ID number. Dots and hyphens are ignored.")
     card_last4: str = Field(description="Last four digits of any of the customer's cards.")
@@ -107,6 +118,10 @@ class TransactionsResponse(BaseModel):
 
 class BlockCardRequest(BaseModel):
     """Ask for a temporary block on one of the customer's cards."""
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"card_last4": "4821", "reason": "suspected fraud"}}
+    )
 
     card_last4: str = Field(description="Last four digits of the card to block.")
     reason: str = Field(description="Why, in a few words. For example: suspected fraud.")

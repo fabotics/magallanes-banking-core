@@ -31,6 +31,20 @@ from app.routers import (
 )
 from app.security import require_api_key
 
+# One line per group of endpoints, shown as the group's heading in `/docs`.
+TAGS = [
+    {"name": "health", "description": "Is the API up, and does it reach its database."},
+    {"name": "identity", "description": "Prove who the customer is. Opens the session."},
+    {"name": "customers", "description": "Who the verified customer is."},
+    {"name": "accounts", "description": "Balances of the verified customer."},
+    {"name": "cards", "description": "Card movements, and the temporary block."},
+    {"name": "cases", "description": "Hand the customer to a person: cases and routes."},
+    {"name": "insurance", "description": "Eligibility, offers with consent, proposals."},
+    {"name": "notifications", "description": "What the bank writes to the customer."},
+    {"name": "registry", "description": "The business behind a merchant tax ID."},
+    {"name": "signing", "description": "The page a proposal link opens. No API key."},
+]
+
 
 def create_app(repository: db.Repository | None = None) -> FastAPI:
     """Build the app.
@@ -42,8 +56,11 @@ def create_app(repository: db.Repository | None = None) -> FastAPI:
     app = FastAPI(
         title="Banco Magallanes banking core",
         description="Mock banking core for a fictional retail bank, built to be called "
-        "by conversational agents as tools.",
+        "by conversational agents as tools. All data is invented. Every `/v1` route needs the "
+        "`X-API-Key` header, and customer routes also need the `X-Session-Token` that identity "
+        "verification returns.",
         version=__version__,
+        openapi_tags=TAGS,
     )
     app.state.repository = repository
     register_error_handlers(app)

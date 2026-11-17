@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PushRequest(BaseModel):
@@ -15,6 +15,16 @@ class PushRequest(BaseModel):
     bank uses the one that names a customer. A request that names nobody is
     answered `not_identified`, and the caller then asks for the ID number.
     """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "customer_id": "31.415.926-8",
+                "conversation_id": "conv_123",
+                "language": "es",
+            }
+        }
+    )
 
     customer_id: str | None = Field(
         default=None,

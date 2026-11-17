@@ -43,8 +43,17 @@ async def validation_error_handler(request: Request, exc: RequestValidationError
     return error_body(422, "invalid_request", f"{field}: {first['msg']}")
 
 
+async def unexpected_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Answer for a bug or an outage: the same shape, and nothing about what went wrong.
+
+    The server still logs the error itself. The caller only learns that it can try again.
+    """
+    return error_body(500, "internal_error", "Something went wrong. Try again in a moment.")
+
+
 def register_error_handlers(app: FastAPI) -> None:
-    """Attach the three handlers so every error leaves in the same shape."""
+    """Attach the handlers so every error leaves in the same shape."""
     app.add_exception_handler(ApiError, api_error_handler)
     app.add_exception_handler(HTTPException, http_error_handler)
     app.add_exception_handler(RequestValidationError, validation_error_handler)
+    app.add_exception_handler(Exception, unexpected_error_handler)

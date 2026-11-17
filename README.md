@@ -1,10 +1,27 @@
 # Magallanes banking core
 
+[![CI](https://github.com/fabotics/magallanes-banking-core/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/fabotics/magallanes-banking-core/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)
+
 A mock banking core API for Banco Magallanes, a fictional Latin American retail bank. It is built to be called by conversational agents as tools: verify a customer, read balances and card transactions, block a card, open a case for a person, check insurance eligibility, record an offer and send a proposal to sign.
 
 It also serves the customer's side of those conversations: a small mock of the bank's phone app at `/app`, where the customer approves an identity confirmation and reads and signs the insurance contract.
 
-Everything in it is invented: the bank, the customers, the document numbers, the merchants.
+> **This is not a real bank, and all data is fictional.** Banco Magallanes does not exist. Every customer, document number, card, phone number, merchant and policy in this repository and on the live demo is invented for demonstration. No real money or personal data is involved. It is a portfolio project, not a product.
+
+| | |
+| --- | --- |
+| Live API documentation | https://magallanes-banking-core.vercel.app/docs |
+| Live customer app | https://magallanes-banking-core.vercel.app/app |
+| Health check | https://magallanes-banking-core.vercel.app/health |
+| Test customers | [Seed customers](#seed-customers) |
+| Run and test it | [Run it locally](#run-it-locally), [Tests](#tests) |
+| Use it from an agent | [Connecting an agent](#connecting-an-agent) |
+| Security | [SECURITY.md](SECURITY.md) |
+| Releases | [CHANGELOG.md](CHANGELOG.md) |
+
+The live API answers `/v1` requests only with its API key, which is not public. `/docs` shows every endpoint, and the tests in this repository show each one working.
 
 ## Why it looks the way it does
 
@@ -26,23 +43,31 @@ A language model follows a prompt most of the time. A bank needs rules that hold
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    customer["Customer on a call or in the app"]
+    agent["Conversational agent<br/>any platform that can call HTTP tools"]
+    browser["Customer browser<br/>/app with PIN, /sign with a link"]
+    subgraph core["Banking core API: FastAPI, one serverless function"]
+        security["security: API key and session"]
+        routers["routers: one per domain<br/>audit: one row per call"]
+        repository["db: the repository"]
+        security --> routers --> repository
+    end
+    database[("Postgres on Supabase<br/>row level security on every table")]
+    outbox["Customer inbox and chat"]
+    crm["CRM"]
+
+    customer --> agent
+    agent -->|"REST with X-API-Key and X-Session-Token"| security
+    agent -->|"MCP: merchant lookup"| security
+    browser --> routers
+    repository --> database
+    routers -.->|"proposal, confirmation, call summary"| outbox
+    routers -.->|"copy of the insurance sale"| crm
 ```
-  Conversational agent
-          |
-          |  HTTPS, X-API-Key, X-Session-Token
-          v
-  +-----------------------------+        +--------------------+
-  |  Banking core API (FastAPI) |        |  Customer browser  |
-  |                             | <----- |  /app  (PIN)       |
-  |  security   API key, session|        |  /sign/{token}     |
-  |  audit      one row per call|        +--------------------+
-  |  routers    one per domain  |
-  |  db         repository      |
-  +-----------------------------+
-          |
-          v
-  Postgres on Supabase (row level security on every table)
-```
+
+The agent holds the conversation and nothing else. It calls this API for every fact and every action, and the API decides what is allowed. The customer proves identity and signs in the bank's app, never by voice alone.
 
 Stack: Python 3.12, FastAPI, Postgres on Supabase through the `supabase` client, Jinja2 for the customer pages, the MCP Python SDK for the merchant lookup tool, pytest and ruff. Hosted as a single serverless function.
 
@@ -58,6 +83,11 @@ app/
   errors.py            one error shape: {"error", "message"}
   confirmations.py     identity confirmation requests answered in the bank's app
   app_session.py       the customer app: PIN check, lock, session cookie
+  waiting.py           how long a status request is held, and what to do next
+  quotes.py            the premium and limit the bank's rules give one customer
+  statement.py         card movements in words: day, hour, repeated charges
+  closing.py           the bank's own summary when a conversation ends without one
+  crm.py, crm_sync.py  optional copy of the insurance sale to the CRM
   pins.py              PIN hashing
   contracts.py         builds the contract per product and language, fingerprint, signature checks
   contract_es.py, contract_en.py   the contract wording
@@ -69,14 +99,15 @@ app/
   messaging.py         optional messages to the customer over Telegram
   mcp_server.py        MCP endpoint with the merchant lookup tool
   clock.py             one way to read and write timestamps
-  schemas.py, schemas_identity.py, schemas_insurance.py, schemas_notifications.py
+  schemas.py, schemas_identity.py, schemas_cases.py, schemas_insurance.py,
+  schemas_notifications.py   request and response models
   routers/             identity, identity_push, customers, accounts, cards, cases, insurance,
                        proposals, registry, notifications, signing,
-                       app_auth, app_pages, app_contract
+                       app_auth, app_pages, app_contract, app_assistant, brand
   templates/           sign.html (signing link) and app/ (the customer app)
 db/schema.sql          tables, checks, indexes, row level security
 seed/                  fictional customers and transactions, dated relative to today
-scripts/               seed.py, smoke_test.py, mcp_check.py
+scripts/               seed.py, smoke_test.py, mcp_check.py and four crm_*.py
 dashboard/             metrics.py and the Streamlit page
 tests/                 one file per area, plus the in-memory repository
 ```
@@ -106,7 +137,7 @@ Row level security is enabled on every table with no policies, so only the serve
 
 ## Endpoints
 
-Interactive documentation is served at `/docs`.
+Interactive documentation is served at `/docs` ([live](https://magallanes-banking-core.vercel.app/docs)): every endpoint has a description and an example body, and the Authorize button takes the API key.
 
 | Method and path | Session | Purpose |
 | --- | --- | --- |
@@ -123,7 +154,7 @@ Interactive documentation is served at `/docs`.
 | GET `/v1/insurance/eligibility` | yes | Products the bank pre-approves, each with a personal quote (number, premium, limit per event, valid until), or the reason there are none |
 | POST `/v1/insurance/offers` | yes | Record an offer and how it ended. `outcome` is `sent` (the customer wants the proposal), `interested` (they want to read it first) or `declined`, with a `loss_reason` for a no: `not_interested`, `price`, `already_insured` or `other`. The older `customer_response` (accepted, declined, info_requested) still works |
 | POST `/v1/insurance/proposals` | yes | Create the proposal for an offer and send it by email and to the customer's chat. It is a contract to sign whether the customer accepted or asked for the details: signing is what accepts. Asking again sends the same proposal again. `valid_until` is the last day to sign, 15 days like the quote |
-| GET `/v1/insurance/proposals/{proposal_number}` | yes | pending, signed or expired. Once signed: the policy number and the start date. `wait` (0 to 20 seconds) holds the request while it is unsigned |
+| GET `/v1/insurance/proposals/{proposal_id}` | yes | `proposal_id` is the proposal number. pending, signed or expired. Once signed: the policy number and the start date. `wait` (0 to 20 seconds) holds the request while it is unsigned |
 | POST `/v1/notifications/call-summary` | yes | Send a written summary of the call to the customer's messaging channel (Telegram) |
 | POST `/v1/notifications/conversation-ended` | no | The caller's platform says a conversation is over (`conversation_id`, at the top level or inside `data`). If the agent sent no summary, the bank writes its own from what it recorded: cases, card blocks, proposals, policies |
 | GET `/v1/registry/merchants/{tax_id}` | no | The business behind a merchant tax ID |
@@ -254,10 +285,12 @@ Five more customers in Peru, Colombia and Mexico use other document types and cu
 ```bash
 ruff check .
 ruff format --check .
-pytest -q
+pytest -q --cov
 ```
 
-The tests run on an in-memory repository and need no network or `.env`. The same checks run on every pull request.
+The tests run on an in-memory repository and need no network or `.env`. There are 277 of them and they cover 97% of the lines of `app/`, `seed/` and the dashboard metrics. The same checks run on every pull request, together with an audit of the dependencies for known vulnerabilities and a CodeQL scan, and the build fails if coverage drops below 90%.
+
+`make help` lists the common tasks: `install`, `run`, `test`, `lint`, `format`, `seed`, `smoke` and `audit`.
 
 To check a running instance end to end:
 
@@ -289,7 +322,7 @@ It uses the same `.env` as the API. Streamlit is only needed for this page, so i
 The API runs on Vercel as one Python function with no extra configuration: `app/main.py` exports `app`, dependencies come from `requirements.txt`, and `.python-version` selects Python 3.12.
 
 1. Import the repository as a new Vercel project. Production branch: `main`.
-2. Set the environment variables: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `BANK_API_KEY`, and `PUBLIC_BASE_URL` (the production URL, used to build signing links). Optional: `TRANSACTIONS_DELAY_SECONDS`, `RESEND_API_KEY`, `EMAIL_FROM`, `TELEGRAM_BOT_TOKEN`.
+2. Set the environment variables: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `BANK_API_KEY`, `APP_PIN_SECRET` and `PUBLIC_BASE_URL` (the production URL, used to build the links sent to customers). Everything else in `.env.example` is optional and switches a feature on: email, chat messages, the phone line, the conversation widget, the CRM copy.
 3. Deploy, then run the smoke test against the production URL.
 
 ## Connecting an agent
@@ -331,7 +364,9 @@ python scripts/mcp_check.py --base-url http://localhost:8000
 
 ## Roadmap
 
-- CRM sync for cases and opportunities.
+- Cases mirrored to the CRM, next to the insurance sale.
+- A signature on the `conversation-ended` notice, and rate limits per caller.
+- A short-lived signed token for the conversation widget in place of the plain customer reference.
 
 ## License
 
